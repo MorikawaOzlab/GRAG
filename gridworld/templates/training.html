@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI学習 | GridWorld Lab</title><link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/training.css"></head>
+<body>
+<header><div><small>GRIDWORLD LAB / 03</small><h1>AI学習</h1></div><nav><a href="http://127.0.0.1:5001">マップ</a><a href="http://127.0.0.1:5002">環境のルール</a><a class="current" href="/">AI学習</a></nav></header>
+<main class="training-lab">
+<section class="lab-heading"><div><p class="eyebrow">LEARN · WATCH · SKIP</p><h2>学習を、その場で見よう。</h2><p>試行錯誤を観察して、好きな回数だけ高速学習。その続きの動きで、成長を確かめる。</p></div><span id="phase-badge" class="phase-badge">学習0回・開始前</span></section>
+<section class="card setup">
+<div class="setup-grid">
+<div class="field"><label for="map-list">マップ</label><select id="map-list"></select></div>
+<div class="field"><label for="mode">AI</label><select id="mode"><option value="q_learning">Q学習</option><option value="ppo">PPOエージェント</option><option value="grag">GRAG</option></select></div>
+<div class="field"><label for="max-steps">1試行の最大行動回数</label><input id="max-steps" type="number" min="1" max="1000000" step="1" value="200"></div>
+<button id="new-training" class="secondary">新しい学習</button>
+</div>
+<div id="learning-controls" class="learning-controls">
+<div class="observation-controls"><button id="observe-training">▶ 観察して学習</button><button id="pause-training" class="secondary" disabled>Ⅱ 一時停止</button><div class="speed-field"><label for="observation-speed">観察速度</label><select id="observation-speed"><option value="320">ゆっくり</option><option value="160" selected>標準</option><option value="80">速く</option><option value="30">最速</option></select></div></div>
+<div class="skip-controls"><div class="field"><label for="batch-episodes">高速学習する試行数</label><input id="batch-episodes" type="number" min="1" max="1000000" step="1" value="100"></div><button id="skip-training" class="skip-button">100試行を高速学習 →</button></div>
+</div>
+<p id="learning-hint" class="hint">観察中も実際に学習します。高速学習はアニメーションを省略し、同じAIを続けて学習させます。最大行動回数の変更は次の試行から適用します。</p>
+<details id="advanced-settings"><summary>学習パラメータ</summary><div class="settings-grid">
+<div class="field"><label for="seed">乱数シード（空欄でランダム）</label><input id="seed" type="number" min="0" max="4294967295" step="1" value="42"></div>
+<div class="field"><label for="discount-factor">割引率 γ</label><input id="discount-factor" type="number" min="0" max="1" step="any" value="0.95"></div>
+<div class="field q-setting"><label for="learning-rate">Q学習の学習率 α</label><input id="learning-rate" type="number" min="0" max="1" step="any" value="0.1"></div>
+<div class="field q-setting"><label for="epsilon">初期探索率 ε</label><input id="epsilon" type="number" min="0" max="1" step="any" value="1"></div>
+<div class="field q-setting"><label for="epsilon-decay">試行ごとの探索率倍率</label><input id="epsilon-decay" type="number" min="0" max="1" step="any" value="0.995"></div>
+<div class="field q-setting"><label for="min-epsilon">探索率の下限</label><input id="min-epsilon" type="number" min="0" max="1" step="any" value="0.05"></div>
+<div class="field ppo-setting" hidden><label for="ppo-learning-rate">PPOの学習率</label><input id="ppo-learning-rate" type="number" min="0.000001" step="any" value="0.0003"></div>
+<div class="field ppo-setting" hidden><label for="ppo-hidden-size">PPOの隠れ層幅</label><input id="ppo-hidden-size" type="number" min="1" step="1" value="64"></div>
+</div><p class="hint">学習パラメータとシードの変更は「新しい学習」で適用します。</p></details>
+<p id="status" class="status" role="status" aria-live="polite">マップを選び、観察または高速学習を始めてください。</p>
+</section>
+<section id="fast-progress" class="fast-progress" hidden aria-live="polite"><div><strong id="fast-progress-label">高速学習中</strong><progress id="skip-progress" max="100" value="0"></progress><small>学習曲線とヒートマップは更新しています。</small></div><button id="stop-fast" class="stop-fast">高速学習を停止</button></section>
+<section id="stats" class="lab-stats" aria-label="学習の集計"></section>
+<section id="results" class="workbench">
+<section class="card live-card"><div class="card-heading"><div><p class="eyebrow">LIVE ENVIRONMENT</p><h2>試行錯誤を観察</h2></div><span id="live-indicator" class="live-indicator">待機</span></div><div class="world-stage"><canvas id="animation" width="700" height="700" role="img" aria-label="実際に学習しているAIの現在位置"></canvas><div id="skip-overlay" class="skip-overlay" hidden><span>⚡</span><strong>アニメーションを省略して学習中</strong><p>同じAIの学習が進んでいます。</p></div></div><p id="live-caption" class="live-caption">学習0回</p><div class="legend"><span><i class="legend-dot agent"></i>AI</span><span><i class="legend-dot start"></i>スタート</span><span><i class="legend-dot goal"></i>ゴール</span><span><i class="legend-dot wall"></i>障害物</span></div><p class="hint">録画や過去の試行の再生ではなく、学習器の現在位置を表示しています。</p></section>
+<section id="heatmap-section" class="card heatmap-card"><div class="card-heading"><div><p class="eyebrow">VISIT HEATMAP</p><h2>訪問回数ヒートマップ</h2></div><div class="heatmap-actions"><span id="visit-count" class="chart-note">0訪問</span><label class="heat-zoom-control" for="heat-zoom">表示倍率<input id="heat-zoom" type="range" min="50" max="250" step="25" value="100"><output id="heat-zoom-value" for="heat-zoom">100%</output></label></div></div><div class="world-stage heat-stage"><canvas id="heatmap" width="1400" height="1400" role="img" tabindex="0" aria-label="学習中の累計訪問回数。マスをクリックして行動確率を確認" aria-describedby="heatmap-help"></canvas></div><div class="heat-legend"><span>0回</span><div></div><span id="heat-max">0回</span></div><p id="heatmap-help" class="hint">マスをクリックすると、その位置での上下左右の行動確率を表示します。倍率を上げたときはスクロールして移動できます。</p><p id="heat-detail" class="hint">開始時の配置と衝突は加算しません。</p></section>
+<section id="curve-section" class="card"><div class="card-heading"><div><p class="eyebrow">LEARNING CURVE</p><h2>学習曲線</h2></div><span id="curve-count" class="chart-note">0試行</span></div><svg id="learning-curve" viewBox="0 0 760 280" class="curve" role="img" aria-label="直近100試行の平均報酬の学習曲線"></svg><p class="hint">横軸：完了した試行数 ／ 縦軸：直近100試行の平均報酬。高速学習中も更新します。</p></section>
+</section>
+</main>
+<div id="policy-popup" class="policy-popup" role="dialog" aria-labelledby="policy-title" tabindex="-1" hidden>
+<div class="policy-heading"><div><p class="eyebrow">ACTION PROBABILITIES</p><h3 id="policy-title">このマスの行動確率</h3></div><button id="policy-close" class="policy-close" type="button" aria-label="行動確率を閉じる">×</button></div>
+<p id="policy-snapshot" class="policy-snapshot"></p>
+<div id="policy-distribution" class="policy-distribution" aria-live="polite"></div>
+<p id="policy-note" class="policy-note"></p>
+<div class="policy-footer"><span id="policy-visits"></span><button id="policy-refresh" class="secondary" type="button">現在の確率に更新</button></div>
+</div>
+<script src="/static/training.js"></script></body></html>

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>環境設定 | GridWorld Lab</title><link rel="stylesheet" href="/static/style.css"></head>
+<body><header><div><small>GRIDWORLD LAB / 02</small><h1>環境のルール</h1></div><nav><a href="http://127.0.0.1:5001">マップ</a><a href="http://127.0.0.1:5002">環境設定</a><a href="http://127.0.0.1:5003">AI学習</a></nav></header>
+<main><p class="lead">環境の動作を確認できます。試行回数、1試行の最大行動回数、AIのパラメータは学習アプリで指定します。</p>
+<section class="card"><h2>グリッドワールドのルール</h2><table><tbody>
+<tr><th>移動</th><td>上下左右へ1マスずつ移動します。</td></tr>
+<tr><th>障害物と外周</th><td>位置は変わりません。衝突も1行動として数えます。</td></tr>
+<tr><th>報酬</th><td>ゴール到達時に1、それ以外は0です。</td></tr>
+<tr><th>試行の終了</th><td>ゴール到達、または学習アプリで指定した最大行動回数で終了します。</td></tr>
+<tr><th>座標</th><td>0始まりの[行, 列]。左上は[0, 0]です。</td></tr>
+</tbody></table><p class="hint">スタート、ゴール、障害物はマップ作成アプリで編集します。</p>
+<a class="button" href="http://127.0.0.1:5003">学習条件を設定する →</a></section></main></body></html>
