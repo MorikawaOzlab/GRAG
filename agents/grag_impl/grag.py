@@ -30,6 +30,7 @@ class Transition:
     next_value: float
     reached_goal: bool
     episode_end: bool = False
+    goal_prompt: str | None = None
 
 def layer_init(layer, std=math.sqrt(2), bias_const=0.0):
     nn.init.orthogonal_(layer.weight, std)
@@ -128,6 +129,7 @@ class GRAG:
         self._generator.manual_seed(self.seed)
 
     def initialize_networks(self, observation:dict):
+        # ネットワークが未初期化のときは初期化をする
         if (self.actor is not None) or (self.critic is not None):
             return
         
@@ -278,20 +280,21 @@ class GRAG:
             old_value=old_value,
             reward=reward,
             next_value=next_value,
-            reached_goal=reached_goal
+            reached_goal=reached_goal,
+            goal_prompt=self.generate_goal_prompt(observation),
         )
 
         self.memory.append(transition)
 
         # rollout_stepごとに学習
         if len(self.memory) >= self.rollout_steps:
-            self._update_ppo()
+            self._update_grag()
 
     def end_episode(self) -> None:
         """ゴール到達または最大行動回数で試行が終わるたびに呼ばれる。"""
         if self.memory:
             self.memory[-1].episode_end = True
-            self._update_ppo()
+            self._update_grag()
     
     def observation_to_tensor(self, observation: dict):
         """観測を[障害物・ゴール・現在位置, 行, 列]のfloat32テンソルに変換する。"""
@@ -451,6 +454,97 @@ class GRAG:
 
         return advantages, returns
 
+    def _update_grag(self) -> None:
+        """対照学習、アドバンテージ計算、PPOによるActor更新を順に行う。"""
+        if not self.memory:
+            return
+
+        transitions = list(self.memory)
+
+        # 1. 対照損失を計算し、2. 両エンコーダーを更新する。
+        crl_loss = self._compute_crl_loss(transitions)
+        if crl_loss is not None:
+            self._update_crl_encoders(crl_loss)
+
+        # 3. 更新後の対照スコアを計算し、4. 選択行動のアドバンテージにする。
+        q_values = self._compute_grag_q_values(transitions)
+        if q_values is None:
+            return
+        advantages = self._compute_grag_advantages(transitions, q_values)
+        if advantages is None:
+            return
+
+        # 5. PPOの更新に成功した場合だけ経験を消去する。
+        # 補助メソッドがpassの間は、学習せずに経験を破棄しない。
+        updated = self._update_ppo_actor(transitions, advantages)
+        if updated:
+            self.memory.clear()
+
+    def _compute_crl_loss(
+        self, transitions: list[Transition],
+    ) -> torch.Tensor | None:
+        """経験から正例・負例を構成し、対照損失を返す。
+
+        入力: 今回の更新に使うN件の経験（状態・行動・目標文・終了情報）。
+        戻り値: 両エンコーダーへの勾配を持つスカラーTensor。
+        対照学習に使えるデータが不足する場合はNoneを返す。
+        ここでは損失の計算だけを行い、重みは更新しない。
+        """
+        pass
+
+    def _update_crl_encoders(self, crl_loss: torch.Tensor) -> None:
+        """対照損失を逆伝播し、sa_encoderとgoal_encoderを更新する。
+
+        入力: _compute_crl_lossが返したスカラー損失。
+        エンコーダー用optimizerの初期化・勾配クリップ・stepを担当する。
+        ActorとスカラーCriticは更新しない。戻り値はなし。
+        """
+        pass
+
+    @torch.no_grad()
+    def _compute_grag_q_values(
+        self, transitions: list[Transition],
+    ) -> torch.Tensor | None:
+        """更新後のエンコーダーで、各経験の全行動の対照スコアを返す。
+
+        入力: N件の経験。各経験のstateとgoal_promptを使う。
+        戻り値: [N, CRL_NUM_ACTIONS]の勾配を持たないTensor。
+        各行の行動順はACTIONS。計算できない場合はNoneを返す。
+        ここでのQは_compute_crl_scoreによる負のユークリッド距離を指し、
+        _compute_crl_qによる定数補正・指数化は行わない。
+        """
+        pass
+
+    @torch.no_grad()
+    def _compute_grag_advantages(
+        self,
+        transitions: list[Transition],
+        q_values: torch.Tensor,
+    ) -> torch.Tensor | None:
+        """各経験で実際に選んだ行動のアドバンテージを返す。
+
+        入力: N件の経験と、同じ順序の全行動スコア[N, CRL_NUM_ACTIONS]。
+        現在のActorの方策確率からV = sum_a pi(a|s) * Q(s,a)を計算し、
+        経験のactionに対応するQからVを引く。スコアは再計算しない。
+        戻り値: 未標準化の固定アドバンテージ[N]。計算できなければNone。
+        """
+        pass
+
+    def _update_ppo_actor(
+        self,
+        transitions: list[Transition],
+        advantages: torch.Tensor,
+    ) -> bool:
+        """固定したアドバンテージで、PPOのActor更新を行う。
+
+        入力: N件の経験と、同じ順序のアドバンテージ[N]。
+        アドバンテージの標準化後、経験のold_log_probを使い、
+        複数epoch・ミニバッチのclipped lossとエントロピー項で更新する。
+        GAEの再計算やCritic・エンコーダーの更新、memoryの消去は行わない。
+        戻り値: 更新を実行したらTrue、実行しなかったらFalse。
+        """
+        pass
+
     def _crl_state_features(self, state: torch.Tensor) -> torch.Tensor:
         """stateテンソルからゴール位置情報を除いた状態特徴。他環境ではこの前処理を差し替える。"""
         return state[..., [0, 2], :, :].flatten(start_dim=-3)
@@ -551,6 +645,7 @@ class GRAG:
         
         return q
 
+
     def get_goal_coordinates(self, map_data: dict) -> tuple[int, int]:
         """マップまたは観測のゴール座標を、0始まりの(行, 列)で返す。"""
         goal_row, goal_col = map_data["goal"]
@@ -559,6 +654,33 @@ class GRAG:
     def generate_goal_prompt(self, map_data: dict) -> str:
         
         # 学習開始時に呼び出す
-        """ゴール座標を取得し、LLMに渡す目標プロンプトを生成する。"""
+        """座標の意味・移動条件・達成条件を含む、固定の目標指示文を生成する。
+
+        LLMにもRuriにも渡せるタスク記述。現在位置は状態特徴が保持するため、
+        positionは含めず、同じマップ・ゴールの文は時刻によって変化させない。
+        """
         goal_row, goal_col = self.get_goal_coordinates(map_data)
-        return f"座標({goal_row}, {goal_col})を目指してください"
+        lines = [
+            "あなたはグリッドマップ内のエージェントをゴールへ導きます。",
+            f"目標: 座標({goal_row}, {goal_col})を目指してください。",
+            "座標は(行, 列)の順で、左上を(0, 0)とする0始まりです。",
+            "行は下向きに、列は右向きに増えます。",
+        ]
+        if "rows" in map_data and "cols" in map_data:
+            rows, cols = map_data["rows"], map_data["cols"]
+            lines.append(f"マップは{rows}行{cols}列で、有効範囲は行0〜{rows - 1}、列0〜{cols - 1}です。")
+        if "start" in map_data:
+            start_row, start_col = map_data["start"]
+            lines.append(f"開始座標は({start_row}, {start_col})です。")
+        if "obstacles" in map_data:
+            obstacles = sorted({tuple(position) for position in map_data["obstacles"]})
+            coordinates = ", ".join(f"({row}, {col})" for row, col in obstacles)
+            lines.append(f"通行できない障害物の座標: {coordinates or 'なし'}。")
+        lines.extend([
+            "1回の行動で上下左右の隣接マスへ1マス移動します。斜め移動はできません。",
+            "行動はup=(-1, 0)、down=(1, 0)、left=(0, -1)、right=(0, 1)です。",
+            "マップの外側や障害物への移動では、その場にとどまります。",
+            f"達成条件: エージェントの現在座標が({goal_row}, {goal_col})と一致することです。",
+            "ゴールに近づくだけでは達成ではありません。移動可能なマスを通って到達してください。",
+        ])
+        return "\n".join(lines)
