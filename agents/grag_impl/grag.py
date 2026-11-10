@@ -455,27 +455,31 @@ class GRAG:
         return advantages, returns
 
     def _update_grag(self) -> None:
-        """対照学習、アドバンテージ計算、PPOによるActor更新を順に行う。"""
+        """各目標の参照正例が揃ってから、対照学習とPPO更新を行う。"""
         if not self.memory:
             return
 
         transitions = list(self.memory)
+        if not self._has_crl_positive_references(transitions):
+            # 経験を保持したまま戻り、次の経験追加後に再確認する。
+            return
 
         # 1. 対照損失を計算し、2. 両エンコーダーを更新する。
         crl_loss = self._compute_crl_loss(transitions)
         if crl_loss is not None:
             self._update_crl_encoders(crl_loss)
 
-        # 3. 更新後の対照スコアを計算し、4. 選択行動のアドバンテージにする。
-        q_values = self._compute_grag_q_values(transitions)
-        if q_values is None:
-            return
+        # 3. 成功経験を参照バッチとして、補正済みQを全行動について計算する。
+        with torch.no_grad():
+            q_inputs = self._prepare_crl_q_inputs(transitions)
+            q_values = self._compute_crl_q(**q_inputs)
+
+        # 4. 補正済みQから選択行動のアドバンテージを計算する。
         advantages = self._compute_grag_advantages(transitions, q_values)
         if advantages is None:
             return
 
         # 5. PPOの更新に成功した場合だけ経験を消去する。
-        # 補助メソッドがpassの間は、学習せずに経験を破棄しない。
         updated = self._update_ppo_actor(transitions, advantages)
         if updated:
             self.memory.clear()
@@ -483,85 +487,174 @@ class GRAG:
     def _compute_crl_loss(
         self, transitions: list[Transition],
     ) -> torch.Tensor | None:
-        """経験から正例・負例を構成し、対照損失を返す。
+        """PRTS式(10)--(12)の双方向対照損失を返す。
 
-        入力: 今回の更新に使うN件の経験（状態・行動・目標文・終了情報）。
-        戻り値: 両エンコーダーへの勾配を持つスカラーTensor。
-        対照学習に使えるデータが不足する場合はNoneを返す。
-        ここでは損失の計算だけを行い、重みは更新しない。
+        入力は時系列順の経験。PRTSの成功デモに対応する、同じ目標の
+        到達成功が確認できた区間だけを使う。失敗・未完了の区間は除く。
+        最後の成功遷移をT-t=0とし、時間重みはgamma**(T-t)。
+        goal_promptをタスクIDとして、同じ目標文を重複除去する。
+
+        スコアはphi(s,a)^T psi(l)。返り値はcrl_coefを掛けた
+        L_sa_to_l + L_l_to_saで、両エンコーダーへの勾配を保持する。
+        crl_gammaの省略時はself.gamma、crl_coefの省略時は1.0を使う。
+        対象経験が2件未満、またはcrl_coef=0の場合はNoneを返す。
+        重み更新・逆伝播・memoryの消去は行わない。
+
+        参照: https://arxiv.org/html/2604.27472v1#S3.SS2
         """
-        pass
+        gamma = float(self.settings.get("crl_gamma", self.gamma))
+        coef = float(self.settings.get("crl_coef", 1.0))
+        if not 0 < gamma < 1:
+            raise ValueError("crl_gammaは0より大きく1未満にしてください。")
+        if not math.isfinite(coef) or coef < 0:
+            raise ValueError("crl_coefは0以上の有限値にしてください。")
+        if len(transitions) < 2 or coef == 0:
+            return None
+
+        prompts, remaining = self._crl_transition_metadata(transitions)
+        valid = [index for index, steps in enumerate(remaining) if steps >= 0]
+        if len(valid) < 2:
+            return None
+        batch_prompts = [prompts[index] for index in valid]
+        unique_prompts = list(dict.fromkeys(batch_prompts))
+        task_ids = {prompt: index for index, prompt in enumerate(unique_prompts)}
+
+        # 言語特徴は固定。学習対象のgoal_encoderの出力はキャッシュしない。
+        missing = [prompt for prompt in unique_prompts if prompt not in self._goal_embedding_cache]
+        if missing:
+            with torch.no_grad():
+                embeddings = encode_language(missing).detach().to(device="cpu", dtype=torch.float32)
+            for prompt, embedding in zip(missing, embeddings):
+                self._goal_embedding_cache[prompt] = embedding.clone()
+        goal_inputs = torch.stack([self._goal_embedding_cache[prompt] for prompt in unique_prompts])
+        states = torch.stack([transitions[index].state for index in valid])
+        actions = torch.tensor([transitions[index].action for index in valid], device=states.device)
+        sa_inputs = state_action_encoder(
+            states, actions, num_actions=self.CRL_NUM_ACTIONS,
+            state_features=self._crl_state_features(states))
+        sa_repr = self._encode_crl_features(self.sa_encoder, sa_inputs)
+        goal_repr = self._encode_crl_features(self.goal_encoder, goal_inputs)
+        dtype = torch.promote_types(sa_repr.dtype, goal_repr.dtype)
+        if dtype in (torch.float16, torch.bfloat16):
+            dtype = torch.float32
+        scores = sa_repr.to(dtype) @ goal_repr.to(device=sa_repr.device, dtype=dtype).T
+        labels = torch.tensor([task_ids[prompt] for prompt in batch_prompts], device=scores.device)
+        log_weights = scores.new_tensor([remaining[index] for index in valid]) * math.log(gamma)
+
+        # 式(11): 分母は重複を除いた全目標。各(s,a)の正例は1つ。
+        sa_to_goal = (log_weights.exp() * nn.functional.cross_entropy(
+            scores, labels, reduction="none")).mean()
+
+        # 式(10),(12): 同じタスクの全(s,a)に、時間重みを正規化して割り当てる。
+        positive_mask = (torch.arange(len(unique_prompts), device=scores.device)[:, None]
+                         == labels[None, :])
+        targets = log_weights[None, :].expand(len(unique_prompts), -1)
+        targets = targets.masked_fill(~positive_mask, -torch.inf).softmax(dim=-1)
+        per_goal_loss = -(targets * scores.T.log_softmax(dim=-1)).sum(dim=-1)
+        # E_{i~B}なので、目標ごとの一様平均ではなく経験数に応じて平均する。
+        goal_to_sa = per_goal_loss[labels].mean()
+        loss = coef * (sa_to_goal + goal_to_sa)
+        if not torch.isfinite(loss):
+            raise FloatingPointError("PRTSの対照損失にNaN/Infがあります。")
+        return loss
 
     def _update_crl_encoders(self, crl_loss: torch.Tensor) -> None:
         """対照損失を逆伝播し、sa_encoderとgoal_encoderを更新する。
 
         入力: _compute_crl_lossが返したスカラー損失。
         エンコーダー用optimizerの初期化・勾配クリップ・stepを担当する。
+        Adamは初回に作成して再利用する。学習率はcrl_learning_rate
+        （省略時はself.learning_rate）、勾配の最大ノルムは0.5。
         ActorとスカラーCriticは更新しない。戻り値はなし。
         """
-        pass
+        if not isinstance(crl_loss, torch.Tensor) or crl_loss.ndim != 0:
+            raise ValueError("crl_lossにはスカラーTensorを指定してください。")
+        if not crl_loss.requires_grad:
+            raise ValueError("crl_lossには勾配を持つTensorを指定してください。")
+        if not torch.isfinite(crl_loss):
+            raise FloatingPointError("対照損失にNaN/Infがあります。")
+
+        parameters = list(self.sa_encoder.parameters()) + list(self.goal_encoder.parameters())
+        if not hasattr(self, "_grag_encoder_optimizer"):
+            learning_rate = float(self.settings.get("crl_learning_rate", self.learning_rate))
+            if not math.isfinite(learning_rate) or learning_rate < 0:
+                raise ValueError("crl_learning_rateは0以上の有限値にしてください。")
+            self._grag_encoder_optimizer = torch.optim.Adam(
+                parameters, lr=learning_rate, eps=1e-5)
+
+        self._grag_encoder_optimizer.zero_grad(set_to_none=True)
+        crl_loss.backward()
+        nn.utils.clip_grad_norm_(parameters, max_norm=0.5, error_if_nonfinite=True)
+        self._grag_encoder_optimizer.step()
+
+    def _has_crl_positive_references(self, transitions: list[Transition]) -> bool:
+        """すべての対象目標に、成功が確認できた参照正例があればTrue。
+
+        正例が不足する場合や経験が空の場合はFalseを返す。
+        _update_gragはFalseなら学習せずに戻り、memoryを保持して待機する。
+        このメソッド自体は経験や重みを変更せず、処理をブロックしない。
+        """
+        if not transitions:
+            return False
+        prompts, remaining = self._crl_transition_metadata(transitions)
+        reference_prompts = {prompt for prompt, steps in zip(prompts, remaining) if steps >= 0}
+        return all(prompt in reference_prompts for prompt in prompts)
 
     @torch.no_grad()
-    def _compute_grag_q_values(
+    def _prepare_crl_q_inputs(
         self, transitions: list[Transition],
-    ) -> torch.Tensor | None:
-        """更新後のエンコーダーで、各経験の全行動の対照スコアを返す。
+    ) -> dict[str, torch.Tensor]:
+        """経験から_compute_crl_qに渡す入力辞書を準備する。
 
-        入力: N件の経験。各経験のstateとgoal_promptを使う。
-        戻り値: [N, CRL_NUM_ACTIONS]の勾配を持たないTensor。
-        各行の行動順はACTIONS。計算できない場合はNoneを返す。
-        ここでのQは_compute_crl_scoreによる負のユークリッド距離を指し、
-        _compute_crl_qによる定数補正・指数化は行わない。
+        空でない時系列順の経験を受け取り、各目標の参照正例は存在すると仮定する。
+        Nは経験数、Aは行動数、Rは成功区間内の参照経験数。
+        全行動の状態・行動特徴[N,A,Dsa]、目標特徴[N,1,Dgoal]、
+        参照内積[N,1,R]、残りステップ数[R]、正例マスク[N,1,R]を返す。
+        返り値は_compute_crl_q(**inputs)として渡せる。勾配は保持しない。
+        補正定数とQ値の計算は_compute_crl_qが担当する。
         """
-        pass
+        prompts, remaining = self._crl_transition_metadata(transitions)
+        valid = [index for index, steps in enumerate(remaining) if steps >= 0]
+        unique_prompts = list(dict.fromkeys(prompts))
+        task_ids = {prompt: index for index, prompt in enumerate(unique_prompts)}
+        missing = [prompt for prompt in unique_prompts if prompt not in self._goal_embedding_cache]
+        if missing:
+            embeddings = encode_language(missing).detach().to(device="cpu", dtype=torch.float32)
+            for prompt, embedding in zip(missing, embeddings):
+                self._goal_embedding_cache[prompt] = embedding.clone()
+        goal_inputs = torch.stack([self._goal_embedding_cache[prompt] for prompt in unique_prompts])
+        labels = torch.tensor([task_ids[prompt] for prompt in prompts], dtype=torch.long)
 
-    @torch.no_grad()
-    def _compute_grag_advantages(
-        self,
-        transitions: list[Transition],
-        q_values: torch.Tensor,
-    ) -> torch.Tensor | None:
-        """各経験で実際に選んだ行動のアドバンテージを返す。
+        states = torch.stack([transition.state for transition in transitions])
+        features = self._crl_state_features(states)
+        reference_indices = torch.tensor(valid, device=states.device)
+        reference_actions = torch.tensor([transitions[index].action for index in valid],
+                                         device=states.device)
+        reference_inputs = state_action_encoder(
+            states[reference_indices], reference_actions, num_actions=self.CRL_NUM_ACTIONS,
+            state_features=features[reference_indices])
+        sa_repr = self._encode_crl_features(self.sa_encoder, reference_inputs)
+        goal_repr = self._encode_crl_features(self.goal_encoder, goal_inputs)
+        dtype = torch.promote_types(sa_repr.dtype, goal_repr.dtype)
+        if dtype in (torch.float16, torch.bfloat16):
+            dtype = torch.float32
+        reference_scores = (goal_repr.to(device=sa_repr.device, dtype=dtype)
+                            @ sa_repr.to(dtype).T)
+        reference_labels = labels[valid].to(reference_scores.device)
+        positive_mask = (torch.arange(len(unique_prompts), device=reference_scores.device)[:, None]
+                         == reference_labels[None, :])
 
-        入力: N件の経験と、同じ順序の全行動スコア[N, CRL_NUM_ACTIONS]。
-        現在のActorの方策確率からV = sum_a pi(a|s) * Q(s,a)を計算し、
-        経験のactionに対応するQからVを引く。スコアは再計算しない。
-        戻り値: 未標準化の固定アドバンテージ[N]。計算できなければNone。
-        """
-        pass
-
-    def _update_ppo_actor(
-        self,
-        transitions: list[Transition],
-        advantages: torch.Tensor,
-    ) -> bool:
-        """固定したアドバンテージで、PPOのActor更新を行う。
-
-        入力: N件の経験と、同じ順序のアドバンテージ[N]。
-        アドバンテージの標準化後、経験のold_log_probを使い、
-        複数epoch・ミニバッチのclipped lossとエントロピー項で更新する。
-        GAEの再計算やCritic・エンコーダーの更新、memoryの消去は行わない。
-        戻り値: 更新を実行したらTrue、実行しなかったらFalse。
-        """
-        pass
-
-    def _crl_state_features(self, state: torch.Tensor) -> torch.Tensor:
-        """stateテンソルからゴール位置情報を除いた状態特徴。他環境ではこの前処理を差し替える。"""
-        return state[..., [0, 2], :, :].flatten(start_dim=-3)
-
-    @staticmethod
-    def _encode_crl_features(encoder: nn.Module, features: torch.Tensor) -> torch.Tensor:
-        """
-        引数のテンソルを, 引数のエンコーダーのdevice/dtypeに合わせ, エンコーダーに変換後のテンソルを入力
-        エンコーダーからの出力を返す
-        """
-        reference = next(encoder.parameters(), None)
-        if reference is None:
-            reference = next(encoder.buffers(), None)
-        if reference is not None:
-            dtype = reference.dtype if reference.is_floating_point() else features.dtype
-            features = features.to(device=reference.device, dtype=dtype)
-        return encoder(features)
+        one_hot = torch.eye(self.CRL_NUM_ACTIONS, device=features.device, dtype=features.dtype)
+        sa_inputs = torch.cat((features[:, None, :].expand(-1, self.CRL_NUM_ACTIONS, -1),
+                               one_hot.expand(len(transitions), -1, -1)), dim=-1)
+        score_labels = labels.to(reference_scores.device)
+        return {
+            "state_action_embedding": sa_inputs,
+            "goal_embedding": goal_inputs[labels.to(goal_inputs.device)][:, None, :],
+            "reference_log_scores": reference_scores[score_labels][:, None, :],
+            "reference_steps_to_goal": reference_scores.new_tensor([remaining[index] for index in valid]),
+            "reference_positive_mask": positive_mask[score_labels][:, None, :],
+        }
 
     def _compute_crl_q(
         self,
@@ -586,6 +679,7 @@ class GRAG:
         マスク省略時は全件を正例とする。
         定数も参照データも未指定ならValueError。
         参照データから計算する場合は残り時間も必須。
+        割引率はcrl_gamma（省略時はself.gamma）を使う。
         同じ目標の行動比較では、同じ参照バッチとC(l)を用いる。
         参照バッチの指定時は、goal_log_constantより参照バッチの計算を優先する。
         """
@@ -631,8 +725,11 @@ class GRAG:
             # 式(21) C(l, B)第2講Σの中身を計算し，テンソルに保持
             # 式(21) r'は，正例のサンプル番号 (正例集合 S(l;B) =  {j1, ... , j_r', ... , j_m}) であることに注意
             # 負例は計算結果を -inf に置き換えることで e^(-inf) = 0 となり除外する 
-            log_weights = (steps * math.log(self.gamma)).masked_fill(~mask, -torch.inf) 
-            goal_log_constant = log_z - torch.logsumexp(log_weights, dim=-1) - math.log1p(-self.gamma)
+            gamma = float(self.settings.get("crl_gamma", self.gamma))
+            if not 0 < gamma < 1:
+                raise ValueError("crl_gammaは0より大きく1未満にしてください。")
+            log_weights = (steps * math.log(gamma)).masked_fill(~mask, -torch.inf)
+            goal_log_constant = log_z - torch.logsumexp(log_weights, dim=-1) - math.log1p(-gamma)
 
         # 定数部分をテンソル化して，log_qの計算
         constant = torch.as_tensor(goal_log_constant, device=log_q.device, dtype=log_q.dtype) 
@@ -645,6 +742,172 @@ class GRAG:
         
         return q
 
+    @torch.no_grad()
+    def _compute_grag_advantages(
+        self,
+        transitions: list[Transition],
+        q_values: torch.Tensor,
+    ) -> torch.Tensor | None:
+        """各経験で実際に選んだ行動のアドバンテージを返す。
+
+        入力: N件の経験と、同じ順序の補正済みQ値[N, CRL_NUM_ACTIONS]。
+        現在のActorの方策確率からV = sum_a pi(a|s) * Q(s,a)を計算し、
+        経験のactionに対応するQからVを引く。Q値は再計算しない。
+        戻り値: 勾配を持たない未標準化のアドバンテージ[N]。経験が空ならNone。
+        Actorの評価はself.minibatch_size件ずつ行う。
+        """
+        if not transitions:
+            return None
+        if not isinstance(q_values, torch.Tensor) or q_values.shape != (len(transitions), self.CRL_NUM_ACTIONS):
+            raise ValueError("q_valuesの形状は[経験数, 行動数]にしてください。")
+        if not q_values.is_floating_point():
+            raise ValueError("q_valuesには浮動小数点Tensorを指定してください。")
+        if not torch.isfinite(q_values).all():
+            raise FloatingPointError("Q値にNaN/Infがあります。")
+        if self.minibatch_size < 1:
+            raise ValueError("ppo_minibatch_sizeは1以上にしてください。")
+
+        advantages = q_values.new_empty(len(transitions))
+        for start in range(0, len(transitions), self.minibatch_size):
+            batch = transitions[start:start + self.minibatch_size]
+            states = torch.stack([transition.state for transition in batch])
+            logits = self._encode_crl_features(self.actor, states)
+            scores = q_values[start:start + len(batch)]
+            action_probs = logits.softmax(dim=-1).to(scores)
+            values = (action_probs * scores).sum(dim=-1)
+            actions = torch.tensor([transition.action for transition in batch],
+                                   dtype=torch.long, device=scores.device)
+            q_taken = scores.gather(1, actions[:, None]).squeeze(-1)
+            advantages[start:start + len(batch)] = q_taken - values
+
+        if not torch.isfinite(advantages).all():
+            raise FloatingPointError("アドバンテージにNaN/Infがあります。")
+        return advantages
+
+    def _update_ppo_actor(
+        self,
+        transitions: list[Transition],
+        advantages: torch.Tensor,
+    ) -> bool:
+        """固定したアドバンテージで、PPOのActor更新を行う。
+
+        入力: N件の経験と、同じ順序のアドバンテージ[N]。
+        アドバンテージの標準化後、経験のold_log_probを使い、
+        複数epoch・ミニバッチのclipped lossとエントロピー項で更新する。
+        _update_ppoのActor更新ループを使い、Actor専用Adamを再利用する。
+        学習率はself.learning_rate、勾配の最大ノルムは0.5。
+        GAEの再計算やCritic・エンコーダーの更新、memoryの消去は行わない。
+        戻り値: 更新を実行したらTrue、実行しなかったらFalse。
+        """
+        if not transitions or self.update_epochs < 1:
+            return False
+        if self.minibatch_size < 1:
+            raise ValueError("ppo_minibatch_sizeは1以上にしてください。")
+        if not isinstance(advantages, torch.Tensor) or advantages.shape != (len(transitions),):
+            raise ValueError("advantagesの形状は[経験数]にしてください。")
+        if not advantages.is_floating_point():
+            raise ValueError("advantagesには浮動小数点Tensorを指定してください。")
+        if not torch.isfinite(advantages).all():
+            raise FloatingPointError("アドバンテージにNaN/Infがあります。")
+
+        # バッチ全体で一度だけ標準化し、全epochで同じ値を使う。
+        fixed_advantages = advantages.detach()
+        if len(transitions) > 1:
+            fixed_advantages = ((fixed_advantages - fixed_advantages.mean())
+                                / (fixed_advantages.std(unbiased=False) + 1e-8))
+        states = torch.stack([transition.state.detach() for transition in transitions])
+        actions = torch.tensor([transition.action for transition in transitions],
+                               dtype=torch.long, device=states.device)
+        parameters = list(self.actor.parameters())
+        old_log_probs = torch.tensor([transition.old_log_prob for transition in transitions],
+                                     dtype=parameters[0].dtype, device=states.device)
+        if not torch.isfinite(old_log_probs).all():
+            raise FloatingPointError("更新前の行動対数確率にNaN/Infがあります。")
+        if not hasattr(self, "_grag_actor_optimizer"):
+            learning_rate = float(self.learning_rate)
+            if not math.isfinite(learning_rate) or learning_rate < 0:
+                raise ValueError("ppo_learning_rateは0以上の有限値にしてください。")
+            self._grag_actor_optimizer = torch.optim.Adam(parameters, lr=learning_rate, eps=1e-5)
+
+        for _ in range(self.update_epochs):
+            indices = torch.randperm(len(transitions), generator=self._generator)
+            for start in range(0, len(transitions), self.minibatch_size):
+                batch_indices = indices[start:start + self.minibatch_size]
+                state_indices = batch_indices.to(states.device)
+                logits = self._encode_crl_features(self.actor, states[state_indices])
+                dist = torch.distributions.Categorical(logits=logits)
+                new_log_probs = dist.log_prob(actions[state_indices].to(logits.device))
+                entropy = dist.entropy().mean()
+                ratio = (new_log_probs - old_log_probs[state_indices].to(logits)).exp()
+                batch_advantages = fixed_advantages[batch_indices.to(fixed_advantages.device)].to(logits)
+
+                pg_loss1 = -batch_advantages * ratio
+                pg_loss2 = -batch_advantages * ratio.clamp(1.0 - self.clip_coef, 1.0 + self.clip_coef)
+                actor_loss = torch.maximum(pg_loss1, pg_loss2).mean()
+                loss = actor_loss - self.ent_coef * entropy
+                if not torch.isfinite(loss):
+                    raise FloatingPointError("PPOのActor損失にNaN/Infがあります。")
+
+                self._grag_actor_optimizer.zero_grad(set_to_none=True)
+                loss.backward()
+                nn.utils.clip_grad_norm_(parameters, max_norm=0.5, error_if_nonfinite=True)
+                self._grag_actor_optimizer.step()
+        return True
+
+    def _crl_transition_metadata(
+        self, transitions: list[Transition],
+    ) -> tuple[list[str], list[int]]:
+        """目標文と成功到達までの残りステップ数を返す。対象外の経験は-1。"""
+        prompts = []
+        for transition in transitions:
+            prompt = transition.goal_prompt
+            if prompt is None:
+                state = transition.state
+                goal_positions = (state[1] == 1).nonzero()
+                if len(goal_positions) != 1:
+                    raise ValueError("stateのゴールチャネルにはゴールを1つ指定してください。")
+                prompt = self.generate_goal_prompt({
+                    "rows": state.shape[-2], "cols": state.shape[-1],
+                    "goal": goal_positions[0].tolist(),
+                    "obstacles": (state[0] == 1).nonzero().tolist(),
+                })
+            if not isinstance(prompt, str) or not prompt.strip():
+                raise ValueError("goal_promptは空でない文字列にしてください。")
+            prompts.append(prompt)
+
+        # ロールアウトの末尾や失敗した試行を、到達成功と取り違えない。
+        remaining = [-1] * len(transitions)
+        success_index = None
+        success_prompt = None
+        for index in reversed(range(len(transitions))):
+            transition = transitions[index]
+            if transition.reached_goal or transition.episode_end:
+                success_index = index if transition.reached_goal else None
+                success_prompt = prompts[index] if transition.reached_goal else None
+            if success_index is not None:
+                if prompts[index] == success_prompt:
+                    remaining[index] = success_index - index
+                else:
+                    success_index = None
+        return prompts, remaining
+
+    def _crl_state_features(self, state: torch.Tensor) -> torch.Tensor:
+        """stateテンソルからゴール位置情報を除いた状態特徴。他環境ではこの前処理を差し替える。"""
+        return state[..., [0, 2], :, :].flatten(start_dim=-3)
+
+    @staticmethod
+    def _encode_crl_features(encoder: nn.Module, features: torch.Tensor) -> torch.Tensor:
+        """
+        引数のテンソルを, 引数のエンコーダーのdevice/dtypeに合わせ, エンコーダーに変換後のテンソルを入力
+        エンコーダーからの出力を返す
+        """
+        reference = next(encoder.parameters(), None)
+        if reference is None:
+            reference = next(encoder.buffers(), None)
+        if reference is not None:
+            dtype = reference.dtype if reference.is_floating_point() else features.dtype
+            features = features.to(device=reference.device, dtype=dtype)
+        return encoder(features)
 
     def get_goal_coordinates(self, map_data: dict) -> tuple[int, int]:
         """マップまたは観測のゴール座標を、0始まりの(行, 列)で返す。"""
