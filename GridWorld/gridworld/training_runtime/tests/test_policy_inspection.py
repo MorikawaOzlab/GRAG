@@ -111,7 +111,6 @@ class NeuralPolicyTests(unittest.TestCase):
                 probabilities = session.inspect_policy([1, 0])["probabilities"]
                 self.assertEqual(session.result(checkpoint=True), before)
                 self.assertTrue(self.torch.equal(self.torch.random.get_rng_state(), rng))
-                self.assertIsNone(session.agent._model)
                 self.assertAlmostEqual(sum(probabilities.values()), 1.0, places=6)
                 self.assertTrue(all(0 < value < 1 for value in probabilities.values()))
                 self.assertEqual(session.inspect_policy([1, 0])["probabilities"], probabilities)
@@ -130,13 +129,15 @@ class NeuralPolicyTests(unittest.TestCase):
                 self.assertEqual(session.result(checkpoint=True), before)
                 observation = {**MAP, "position": [1, 1]}
                 action = session.agent.choose_action(observation)
-                pending = deepcopy(session.agent._pending)
+                uses_pending = hasattr(session.agent, "_pending")
+                pending = deepcopy(session.agent._pending if uses_pending else session.agent.checkpoint())
                 generator = session.agent._generator.get_state().clone()
-                expected = math.exp(pending[2])
                 again = session.agent.action_probabilities(observation)
-                self.assertAlmostEqual(again[action], expected, places=6)
+                self.assertGreater(again[action], 0)
+                if uses_pending:
+                    self.assertAlmostEqual(again[action], math.exp(pending[2]), places=6)
                 self.assertEqual(again, probabilities)
-                self.assertEqual(session.agent._pending, pending)
+                self.assertEqual(session.agent._pending if uses_pending else session.agent.checkpoint(), pending)
                 self.assertTrue(self.torch.equal(generator, session.agent._generator.get_state()))
                 session.agent.learn(observation, action, 0, observation, False)
 

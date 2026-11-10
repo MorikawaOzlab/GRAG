@@ -164,7 +164,8 @@ class SessionApiTests(unittest.TestCase):
                                  "mode": "grag", "episodes": 2, "session_id": sid}))
                 self.assertEqual(final["settings"]["episodes"], 4)
                 saved = storage.read_json(training_app.saved_session_path(sid))
-                self.assertIsNotNone(saved["agent_checkpoint"]["optimizer"])
+                self.assertIn("_actor_optimizer", saved["agent_checkpoint"]["optimizers"])
+                self.assertIn("_encoder_optimizer", saved["agent_checkpoint"]["optimizers"])
                 self.assertIsNotNone(saved["agent_checkpoint"]["generator"])
         finally:
             torch.set_num_threads(threads)

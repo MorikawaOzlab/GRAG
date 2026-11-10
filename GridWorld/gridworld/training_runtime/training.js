@@ -2,7 +2,8 @@ const $ = id => document.getElementById(id);
 let result = null, job = null, selectedMap = null, busy = false, initialized = false;
 let heatmapMap = null, selectedHeatCell = null, policyRequest = 0, policyAnchor = null;
 let lastCompletedJob = null, lastDrawn = null, animationHandle = null;
-const ppoMode = () => ['ppo', 'grag'].includes($('mode').value);
+const ppoMode = () => $('mode').value === 'ppo';
+const gragMode = () => $('mode').value === 'grag';
 const matches = data => data && data.map.name === $('map-list').value && data.mode === $('mode').value;
 const interactive = () => job && job.execution !== 'batch' && ['running', 'paused'].includes(job.status) && matches(result) && job.session_id === result.session_id;
 const integer = (value, min, max) => Number.isSafeInteger(value) && value >= min && value <= max;
@@ -24,6 +25,8 @@ function syncControls() {
   const skipping = current && job.execution === 'fast' && active;
   document.querySelectorAll('.q-setting').forEach(el => el.hidden = $('mode').value !== 'q_learning');
   document.querySelectorAll('.ppo-setting').forEach(el => el.hidden = !ppoMode());
+  document.querySelectorAll('.crl-setting').forEach(el => el.hidden = !gragMode());
+  $('discount-factor').parentElement.hidden = gragMode();
   $('map-list').disabled = busy || active; $('mode').disabled = busy || active;
   $('new-training').disabled = !initialized || !selectedMap || busy || active;
   $('observe-training').disabled = !initialized || !selectedMap || busy || watching || (active && !current);
@@ -57,6 +60,13 @@ function trainingSettings() {
   if (ppoMode()) {
     value.ppo_learning_rate = Number($('ppo-learning-rate').value);
     value.ppo_hidden_size = Number($('ppo-hidden-size').value);
+  }
+  if (gragMode()) {
+    value.crl_gamma = Number($('crl-gamma').value);
+    value.crl_learning_rate = Number($('crl-learning-rate').value);
+    value.crl_actor_learning_rate = value.crl_learning_rate;
+    value.crl_hidden_size = Number($('crl-hidden-size').value);
+    value.crl_min_replay_size = Number($('crl-min-replay').value);
   }
   return value;
 }
@@ -371,7 +381,8 @@ if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => redrawHeat()
     $('map-list').replaceChildren(...maps.map(map => new Option(map.name + ' (' + map.rows + '×' + map.cols + ')', map.name)));
     for (const agent of agents) if (![...$('mode').options].some(option => option.value === agent.key)) $('mode').add(new Option(agent.name, agent.key));
     const ids = { max_steps: 'max-steps', seed: 'seed', discount_factor: 'discount-factor', learning_rate: 'learning-rate',
-      epsilon: 'epsilon', epsilon_decay: 'epsilon-decay', min_epsilon: 'min-epsilon', ppo_learning_rate: 'ppo-learning-rate', ppo_hidden_size: 'ppo-hidden-size' };
+      epsilon: 'epsilon', epsilon_decay: 'epsilon-decay', min_epsilon: 'min-epsilon', ppo_learning_rate: 'ppo-learning-rate', ppo_hidden_size: 'ppo-hidden-size',
+      crl_gamma: 'crl-gamma', crl_learning_rate: 'crl-learning-rate', crl_hidden_size: 'crl-hidden-size', crl_min_replay_size: 'crl-min-replay' };
     for (const [key, id] of Object.entries(ids)) if (config[key] !== undefined) $(id).value = config[key] ?? '';
     try {
       const saved = await api('/api/result');

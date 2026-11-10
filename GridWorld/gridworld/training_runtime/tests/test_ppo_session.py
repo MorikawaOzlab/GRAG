@@ -64,7 +64,8 @@ class PPOSessionTests(unittest.TestCase):
                 split.step()
                 saved = json.loads(json.dumps(split.result(checkpoint=True)))
                 self.assertTrue(saved["episode_state"]["active"])
-                self.assertGreater(len(saved["agent_checkpoint"]["rollout"]), 0)
+                pending_key = "episode" if issubclass(agent_type, GRAG) else "rollout"
+                self.assertGreater(len(saved["agent_checkpoint"][pending_key]), 0)
                 restored = TrainingSession.restore(saved, agent_type)
                 restored.run_batch(6)
                 self.assertEqual(restored.history, continuous.history)

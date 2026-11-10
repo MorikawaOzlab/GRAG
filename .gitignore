@@ -2,3 +2,6 @@ venv/
 __pycache__/
 *.pyc
 data/
+
+babyai/data/
+GridWorld/data/

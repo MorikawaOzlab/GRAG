@@ -26,6 +26,11 @@
 <div class="field q-setting"><label for="min-epsilon">探索率の下限</label><input id="min-epsilon" type="number" min="0" max="1" step="any" value="0.05"></div>
 <div class="field ppo-setting" hidden><label for="ppo-learning-rate">PPOの学習率</label><input id="ppo-learning-rate" type="number" min="0.000001" step="any" value="0.0003"></div>
 <div class="field ppo-setting" hidden><label for="ppo-hidden-size">PPOの隠れ層幅</label><input id="ppo-hidden-size" type="number" min="1" step="1" value="64"></div>
+<div class="field crl-setting" hidden><label for="crl-gamma">GRAGの割引率 γ</label><input id="crl-gamma" type="number" min="0.000001" max="0.999999" step="any" value="0.99"></div>
+<div class="field crl-setting" hidden><label for="crl-learning-rate">GRAGの学習率</label><input id="crl-learning-rate" type="number" min="0.000001" step="any" value="0.0003"></div>
+<div class="field crl-setting" hidden><label for="crl-hidden-size">GRAGの隠れ層幅</label><input id="crl-hidden-size" type="number" min="1" step="1" value="256"></div>
+<div class="field crl-setting" hidden><label for="crl-min-replay">GRAGの初期収集遷移数</label><input id="crl-min-replay" type="number" min="2" step="1" value="10000"></div>
+<p class="hint crl-setting" hidden>GRAGは初期収集を終えてから学習します。ゴールは常に迷路のGです。表示する到達率は評価用で、報酬値は学習に使いません。</p>
 </div><p class="hint">学習パラメータとシードの変更は「新しい学習」で適用します。</p></details>
 <p id="status" class="status" role="status" aria-live="polite">マップを選び、観察または高速学習を始めてください。</p>
 </section>
