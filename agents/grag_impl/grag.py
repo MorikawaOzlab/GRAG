@@ -18,13 +18,8 @@ from torch import nn
 
 from dataclasses import dataclass
 
-<<<<<<< Updated upstream
-=======
-from .components.language import encode_language
 from .components.losses import compute_crl_loss, compute_ppo_loss
 from .components.networks import build_networks
-
->>>>>>> Stashed changes
 ACTIONS = ("up", "down", "left", "right")
 
 @dataclass
@@ -145,55 +140,9 @@ class GRAG:
         state = self.observation_to_tensor(observation)
         observation_shape = state.shape
 
-<<<<<<< Updated upstream
-        # 初期化にseedを反映し、外部のグローバル乱数状態は元に戻す。
-        with torch.random.fork_rng(devices=[]):
-            torch.random.default_generator.manual_seed(self.seed)
-            self.actor = nn.Sequential(
-                nn.Flatten(start_dim=-3),
-                layer_init(nn.Linear(math.prod(observation_shape), self.hidden_size)),
-                nn.Tanh(),
-                layer_init(nn.Linear(self.hidden_size, self.hidden_size)),
-                nn.Tanh(),
-                layer_init(nn.Linear(self.hidden_size, len(ACTIONS)), std=0.01)
-            )
-
-            self.critic = nn.Sequential(
-                nn.Flatten(start_dim=-3),
-                layer_init(nn.Linear(math.prod(observation_shape), self.hidden_size)),
-                nn.Tanh(),
-                layer_init(nn.Linear(self.hidden_size, self.hidden_size)),
-                nn.Tanh(),
-                layer_init(nn.Linear(self.hidden_size, 1), std=1.0)
-            )
-
-            # CPPOのMLP構成: 512幅×4層、LayerNorm、Swish、64次元出力。
-            # PRTSの phi(s, a): 目標チャネルを除いた障害物・現在位置を
-            # 平坦化し、行動one-hotを連結したベクトルを入力する。
-            self.sa_encoder = nn.Sequential(
-                nn.Linear(2 * math.prod(observation_shape[-2:]) + self.CRL_NUM_ACTIONS, 512),
-                nn.LayerNorm(512), nn.SiLU(),
-                nn.Linear(512, 512), nn.LayerNorm(512), nn.SiLU(),
-                nn.Linear(512, 512), nn.LayerNorm(512), nn.SiLU(),
-                nn.Linear(512, 512), nn.LayerNorm(512), nn.SiLU(),
-                nn.Linear(512, 64),
-            )
-
-            # PRTSの psi(l): 外部で抽出した言語特徴ベクトルを入力する。
-            # 入力次元は goal_embedding_dim（既定値: self.hidden_size）。
-            self.goal_encoder = nn.Sequential(
-                nn.Linear(384, 512),
-                nn.LayerNorm(512), nn.SiLU(),
-                nn.Linear(512, 512), nn.LayerNorm(512), nn.SiLU(),
-                nn.Linear(512, 512), nn.LayerNorm(512), nn.SiLU(),
-                nn.Linear(512, 512), nn.LayerNorm(512), nn.SiLU(),
-                nn.Linear(512, 64),
-            )
-=======
         self.actor, self.sa_encoder, self.goal_encoder = build_networks(
             observation_shape, self.hidden_size, self.CRL_NUM_ACTIONS, seed=self.seed
         )
->>>>>>> Stashed changes
 
         self.optimizer = torch.optim.Adam(
             list(self.actor.parameters()),
