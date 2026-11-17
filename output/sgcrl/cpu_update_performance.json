@@ -1,0 +1,35 @@
+{
+  "device": "cpu",
+  "torch": "2.14.1+cu130",
+  "gpu": null,
+  "batch_size": 256,
+  "state_dim": 800,
+  "goal_dim": 800,
+  "hidden_size": 256,
+  "repr_dim": 64,
+  "replay_size": 10000,
+  "updates_per_trial": 50,
+  "seconds": {
+    "legacy_sampling_adam": [
+      1.6785615000007965,
+      1.7333112999986042,
+      1.711489299999812
+    ],
+    "cached_fused": [
+      1.6798683000015444,
+      1.6957658999999694,
+      1.6906926999981806
+    ],
+    "cached_fused_shared": [
+      1.2003933000014513,
+      1.18400400000246,
+      1.1937307999978657
+    ]
+  },
+  "median_updates_per_second": {
+    "legacy_sampling_adam": 29.214322286446954,
+    "cached_fused": 29.57367710882871,
+    "cached_fused_shared": 41.88549043058066
+  },
+  "speedup": 1.4337313739436663
+}

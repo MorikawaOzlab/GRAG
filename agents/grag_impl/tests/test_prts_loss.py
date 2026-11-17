@@ -28,7 +28,6 @@ class PRTSLossTests(unittest.TestCase):
             self.agent.sa_encoder = nn.Linear(12, 3).double()
             self.agent.goal_encoder = nn.Linear(384, 3).double()
             self.agent.actor = nn.Sequential(nn.Flatten(start_dim=-3), nn.Linear(12, 4)).double()
-            self.agent.critic = nn.Linear(12, 1).double()
             self.agent._goal_embedding_cache = {"A": torch.randn(384), "B": torch.randn(384)}
 
     def transition(self, prompt="A", position=(0, 0), action=0, success=False, end=False):
@@ -36,7 +35,7 @@ class PRTSLossTests(unittest.TestCase):
         state = torch.zeros(3, 2, 2, dtype=torch.float64)
         state[1, goal[0], goal[1]] = 1
         state[2, position[0], position[1]] = 1
-        return Transition(state, action, 0., 0., 0., 0., success, end, prompt)
+        return Transition(state, action, 0., 0., success, end, prompt)
 
     def batch(self):
         return [self.transition(position=(0, 0), action=1),
@@ -114,7 +113,7 @@ class PRTSLossTests(unittest.TestCase):
             gradients = [p.grad for p in encoder.parameters()]
             self.assertTrue(all(g is not None and torch.isfinite(g).all() for g in gradients))
             self.assertGreater(sum(g.abs().sum().item() for g in gradients), 0.)
-        for network in (self.agent.actor, self.agent.critic):
+        for network in (self.agent.actor,):
             self.assertTrue(all(p.grad is None for p in network.parameters()))
         self.assertEqual(len(self.agent.memory), len(transitions))
 
@@ -168,7 +167,7 @@ class PRTSLossTests(unittest.TestCase):
         self.agent.memory = transitions.copy()
         encoders = (self.agent.sa_encoder, self.agent.goal_encoder)
         encoder_before = [[p.detach().clone() for p in encoder.parameters()] for encoder in encoders]
-        other_networks = (self.agent.actor, self.agent.critic)
+        other_networks = (self.agent.actor,)
         other_before = [[p.detach().clone() for p in network.parameters()] for network in other_networks]
         before_loss = self.agent._compute_crl_loss(transitions)
         self.assertIsNone(self.agent._update_crl_encoders(before_loss))
@@ -243,23 +242,21 @@ class PRTSLossTests(unittest.TestCase):
         self.assertTrue(torch.isfinite(parameter).all())
         self.assertFalse(torch.equal(parameter, before))
 
-    def test_relocated_q_keeps_explicit_constant_and_gradients(self):
+    def test_q_is_exponentiated_inner_product_for_all_actions(self):
         transitions = self.batch()
-        states = torch.stack([tr.state for tr in transitions])
-        actions = torch.tensor([tr.action for tr in transitions])
-        features = state_action_encoder(states, actions)
-        goals = torch.stack([self.agent._goal_embedding_cache[tr.goal_prompt] for tr in transitions])
-        constant = torch.tensor([0.1, 0.2, 0.3, 0.4], dtype=torch.float64)
-        q_values = self.agent._compute_crl_q(features, goals, goal_log_constant=constant)
-        phi = self.agent.sa_encoder(features)
-        psi = self.agent.goal_encoder(goals.double())
-        torch.testing.assert_close(q_values, ((phi * psi).sum(-1) - constant).exp())
-        q_values.sum().backward()
-        for encoder in (self.agent.sa_encoder, self.agent.goal_encoder):
-            self.assertTrue(all(p.grad is not None and torch.isfinite(p.grad).all()
-                                for p in encoder.parameters()))
+        inputs = self.agent._prepare_crl_q_inputs(transitions)
+        q_values = self.agent._compute_crl_q(**inputs)
+        self.assertEqual(q_values.shape, (len(transitions), 4))
+        self.assertFalse(q_values.requires_grad)
+        with torch.no_grad():
+            for index, transition in enumerate(transitions):
+                psi = self.agent.goal_encoder(inputs["goal"][index])
+                for action in range(4):
+                    sa = state_action_encoder(transition.state, action)
+                    expected = (self.agent.sa_encoder(sa) * psi).sum().exp()
+                    torch.testing.assert_close(q_values[index, action], expected)
 
-    def test_grag_update_passes_calibrated_all_action_q_to_advantages(self):
+    def test_grag_update_passes_exponential_inner_product_q_to_advantages(self):
         transitions = self.batch()
         self.agent.memory = transitions.copy()
         self.agent._compute_grag_advantages = Mock(wraps=self.agent._compute_grag_advantages)
@@ -280,25 +277,13 @@ class PRTSLossTests(unittest.TestCase):
         torch.testing.assert_close(advantages, expected)
         self.assertFalse(advantages.requires_grad)
 
-        # 更新後の重みを使い、各行動のQと補正定数をスカラーの式で照合する。
-        states = torch.stack([tr.state for tr in transitions])
-        reference_features = state_action_encoder(states, torch.tensor([tr.action for tr in transitions]))
-        gamma = self.agent.settings["crl_gamma"]
-        remaining = [2, 1, 0, 0]
         with torch.no_grad():
-            reference_phi = self.agent.sa_encoder(reference_features)
             for index, transition in enumerate(transitions):
                 goal_input = self.agent._goal_embedding_cache[transition.goal_prompt].double()
                 psi = self.agent.goal_encoder(goal_input)
-                reference_scores = [float((phi * psi).sum()) for phi in reference_phi]
-                maximum = max(reference_scores)
-                log_z = maximum + math.log(sum(math.exp(s - maximum) for s in reference_scores))
-                total_weight = sum(gamma ** steps for tr, steps in zip(transitions, remaining)
-                                   if tr.goal_prompt == transition.goal_prompt)
-                constant = log_z - math.log(total_weight) - math.log1p(-gamma)
                 for action in range(self.agent.CRL_NUM_ACTIONS):
                     phi = self.agent.sa_encoder(state_action_encoder(transition.state, action))
-                    expected = math.exp(float((phi * psi).sum()) - constant)
+                    expected = math.exp(float((phi * psi).sum()))
                     self.assertAlmostEqual(q_values[index, action].item(), expected, places=12)
 
     def test_advantages_match_known_policy_and_taken_actions_without_recomputing_q(self):
@@ -364,7 +349,7 @@ class PRTSLossTests(unittest.TestCase):
         with torch.no_grad():
             before_probability = self.agent.actor(transition.state).softmax(-1)[1].item()
             transition.old_log_prob = math.log(before_probability)
-        other_parameters = [p for network in (self.agent.critic, self.agent.sa_encoder, self.agent.goal_encoder)
+        other_parameters = [p for network in (self.agent.sa_encoder, self.agent.goal_encoder)
                             for p in network.parameters()]
         before = [p.detach().clone() for p in other_parameters]
         advantages = (1 + 0 * self.agent.sa_encoder.weight.sum()).reshape(1)
@@ -432,6 +417,32 @@ class PRTSLossTests(unittest.TestCase):
         norm = torch.cat([p.grad.flatten() for p in self.agent.actor.parameters()]).norm().item()
         self.assertLessEqual(norm, 0.500001)
 
+    def test_actor_step_limit_is_total_across_epochs_and_resets_each_call(self):
+        for limit, count, batch_size in ((16, 40, 2), (5, 5, 2)):
+            with self.subTest(limit=limit):
+                agent = deepcopy(self.agent)
+                agent.actor_max_steps = limit
+                agent.update_epochs = 10
+                agent.minibatch_size = batch_size
+                transitions = [self.transition(action=i % 4) for i in range(count)]
+                advantages = torch.arange(count, dtype=torch.float64)
+                for call in range(2):
+                    with torch.no_grad():
+                        for transition in transitions:
+                            transition.old_log_prob = agent.actor(transition.state).log_softmax(-1)[
+                                transition.action].item()
+                    self.assertTrue(agent._update_ppo_actor(transitions, advantages))
+                    for parameter in agent.actor.parameters():
+                        self.assertEqual(agent._grag_actor_optimizer.state[parameter]["step"].item(),
+                                         limit * (call + 1))
+
+    def test_actor_step_limit_setting(self):
+        self.assertEqual(GRAG({}).actor_max_steps, 16)
+        self.assertEqual(GRAG({"grag_actor_max_steps": 3}).actor_max_steps, 3)
+        for value in (0, -1, True, 1.5, "16", None):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                GRAG({"grag_actor_max_steps": value})
+
     def test_entropy_term_increases_entropy_when_normalized_advantages_are_zero(self):
         self.agent.update_epochs = 1
         self.agent.ent_coef = 0.1
@@ -476,15 +487,13 @@ class PRTSLossTests(unittest.TestCase):
             for transition in transitions:
                 logits = self.agent.actor(transition.state)
                 transition.old_log_prob = logits.log_softmax(-1)[transition.action].item()
-        networks = (self.agent.sa_encoder, self.agent.goal_encoder, self.agent.actor, self.agent.critic)
+        networks = (self.agent.sa_encoder, self.agent.goal_encoder, self.agent.actor)
         before = [[p.detach().clone() for p in network.parameters()] for network in networks]
         self.agent.memory = transitions.copy()
         self.agent._update_grag()
         self.assertEqual(self.agent.memory, [])
         for network, saved in zip(networks[:3], before[:3]):
             self.assertTrue(any(not torch.equal(p, old) for p, old in zip(network.parameters(), saved)))
-        for parameter, saved in zip(self.agent.critic.parameters(), before[3]):
-            torch.testing.assert_close(parameter, saved, rtol=0, atol=0)
         self.assertTrue(hasattr(self.agent, "_grag_encoder_optimizer"))
         self.assertTrue(hasattr(self.agent, "_grag_actor_optimizer"))
 

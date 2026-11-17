@@ -65,6 +65,14 @@ class SessionApiTests(unittest.TestCase):
             time.sleep(.01)
         self.fail("Training did not complete")
 
+    def test_grag_success_threshold_is_kept_from_training_settings(self):
+        result = self.wait(self.post("/api/train", {
+            "map_name": MAP["name"], "mode": "grag", "episodes": 1,
+            "training_settings": {"max_steps": 1, "grag_positive_update_count": 8},
+        }))
+        self.assertEqual(result["settings"]["grag_positive_update_count"], 8)
+        self.assertEqual(result["successes"], 0)
+
     def test_start_continue_evaluate_and_restart_keep_cumulative_learning(self):
         first = self.wait(self.post("/api/train", {"map_name": MAP["name"], "episodes": 100}))
         self.assertEqual(first["settings"]["episodes"], 100)
@@ -103,6 +111,115 @@ class SessionApiTests(unittest.TestCase):
             agent = training_app.learning_sessions[first["session_id"]]["session"].agent
             self.assertEqual(agent.episodes, 5)
             self.assertEqual(agent.updates, 15)
+
+    def test_benchmark_starts_fresh_and_stops_at_first_100_successes(self):
+        with patch.dict(training_app.LEARNING_AGENTS, {"benchmark_test": CountingAgent}):
+            old = self.wait(self.post("/api/train", {"map_name": MAP["name"],
+                            "mode": "benchmark_test", "episodes": 3}))
+            final = self.wait(self.post("/api/train", {"map_name": MAP["name"],
+                              "mode": "benchmark_test", "execution": "benchmark", "episodes": 120}))
+            self.assertNotEqual(old["session_id"], final["session_id"])
+            self.assertEqual(final["completed_episodes"], 100)
+            self.assertEqual(final["benchmark"]["status"], "reached")
+            self.assertEqual(final["benchmark"]["start_episode"], 0)
+            self.assertEqual(final["success_100_milestone"]["episode"], 100)
+            self.assertEqual(final["training_seconds"], final["success_100_milestone"]["seconds"])
+            self.assertEqual(self.get("/api/train/status")["benchmark_outcome"], "reached")
+            with self.assertRaises(HTTPError) as error:
+                self.post("/api/train", {"map_name": MAP["name"], "mode": "benchmark_test",
+                          "execution": "benchmark", "episodes": 120, "session_id": old["session_id"]})
+            self.assertEqual(error.exception.code, 400)
+
+    def test_benchmark_reports_limit_without_claiming_100_percent(self):
+        class FailingAgent(CountingAgent):
+            def choose_action(self, observation, greedy=False):
+                return "up"
+
+        with patch.dict(training_app.LEARNING_AGENTS, {"benchmark_test": FailingAgent}):
+            final = self.wait(self.post("/api/train", {"map_name": MAP["name"],
+                              "mode": "benchmark_test", "execution": "benchmark", "max_hours": 0.000000001}))
+            self.assertGreaterEqual(final["training_seconds"], 0.000000001 * 3600)
+            self.assertEqual(final["benchmark"]["status"], "limit")
+            self.assertEqual(final["benchmark"]["max_hours"], 0.000000001)
+            self.assertIsNone(final["success_100_milestone"])
+
+    def test_benchmark_can_be_stopped_and_cannot_change_training_mode(self):
+        entered, release = threading.Event(), threading.Event()
+
+        class BlockingAgent(CountingAgent):
+            def choose_action(self, observation, greedy=False):
+                if not greedy:
+                    entered.set()
+                    release.wait(timeout=5)
+                return super().choose_action(observation, greedy)
+
+        with patch.dict(training_app.LEARNING_AGENTS, {"benchmark_test": BlockingAgent}):
+            job = self.post("/api/train", {"map_name": MAP["name"], "mode": "benchmark_test",
+                            "execution": "benchmark", "episodes": 120})
+            try:
+                self.assertTrue(entered.wait(timeout=5))
+                with self.assertRaises(HTTPError) as error:
+                    self.post("/api/train/control", {"session_id": job["session_id"],
+                              "action": "skip", "episodes": 5})
+                self.assertEqual(error.exception.code, 400)
+                self.post("/api/train/control", {"session_id": job["session_id"], "action": "pause"})
+            finally:
+                release.set()
+            final = self.wait(job)
+            self.assertEqual(final["benchmark"]["status"], "cancelled")
+            self.assertIsNone(final["success_100_milestone"])
+
+    def test_sgcrl_train_evaluate_and_restart(self):
+        import torch
+        threads = torch.get_num_threads()
+        torch.set_num_threads(1)
+        try:
+            settings = {**SETTINGS, "crl_hidden_size": 16, "crl_batch_size": 8,
+                        "crl_min_replay_size": 2}
+            with patch.object(training_app, "load_settings", return_value=settings), \
+                    patch.object(training_app, "configure_ppo_cpu_threads", return_value=1):
+                first = self.wait(self.post("/api/train", {"map_name": MAP["name"],
+                                       "mode": "sgcrl", "episodes": 4}))
+                sid = first["session_id"]
+                training_app.learning_sessions.clear()
+                final = self.wait(self.post("/api/train", {"map_name": MAP["name"],
+                                 "mode": "sgcrl", "episodes": 2, "session_id": sid}))
+                self.assertEqual(final["completed_episodes"], 6)
+                agent = training_app.learning_sessions[sid]["session"].agent
+                self.assertGreater(agent._updates, 0)
+                self.assertEqual(final["mode"], "sgcrl")
+                self.assertGreater(len(final["frames"]), 1)
+        finally:
+            torch.set_num_threads(threads)
+
+    def test_cppo_train_policy_evaluate_and_restart(self):
+        import torch
+        threads = torch.get_num_threads()
+        torch.set_num_threads(1)
+        try:
+            settings = {**SETTINGS, "cppo_hidden_size": 16, "cppo_depth": 2,
+                        "cppo_repr_dim": 8, "cppo_batch_size": 8, "cppo_rollout_steps": 8}
+            with patch.object(training_app, "load_settings", return_value=settings), \
+                    patch.object(training_app, "configure_ppo_cpu_threads", return_value=1):
+                self.assertIn("cppo", [agent["key"] for agent in self.get("/api/agents")])
+                first = self.wait(self.post("/api/train", {"map_name": MAP["name"],
+                                       "mode": "cppo", "episodes": 4}))
+                sid = first["session_id"]
+                policy = self.post("/api/train/policy", {"session_id": sid, "mode": "cppo",
+                                   "map_name": MAP["name"], "position": MAP["start"]})
+                self.assertAlmostEqual(sum(policy["probabilities"].values()), 1, places=6)
+                before = storage.read_json(training_app.saved_session_path(sid))["agent_checkpoint"]
+                self.wait(self.post("/api/train/evaluate", {"map_name": MAP["name"],
+                          "mode": "cppo", "session_id": sid}))
+                self.assertEqual(before, storage.read_json(training_app.saved_session_path(sid))["agent_checkpoint"])
+                training_app.learning_sessions.clear()
+                final = self.wait(self.post("/api/train", {"map_name": MAP["name"], "mode": "cppo",
+                                 "episodes": 2, "session_id": sid}))
+                self.assertEqual(final["completed_episodes"], 6)
+                self.assertEqual(final["mode"], "cppo")
+                self.assertGreater(training_app.learning_sessions[sid]["session"].agent.updates, 0)
+        finally:
+            torch.set_num_threads(threads)
 
     def test_mismatched_map_agent_and_invalid_requests_are_rejected(self):
         first = self.wait(self.post("/api/train", {"map_name": MAP["name"], "episodes": 2}))

@@ -1,0 +1,6291 @@
+{
+  "map": {
+    "name": "\u30b5\u30f3\u30d7\u30eb\u30de\u30c3\u30d7",
+    "rows": 8,
+    "cols": 10,
+    "start": [
+      7,
+      0
+    ],
+    "goal": [
+      0,
+      9
+    ],
+    "obstacles": [
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        7
+      ],
+      [
+        0,
+        8
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        7
+      ],
+      [
+        1,
+        8
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        2,
+        7
+      ],
+      [
+        2,
+        8
+      ],
+      [
+        3,
+        1
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        4,
+        7
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        5,
+        7
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        7,
+        4
+      ],
+      [
+        7,
+        7
+      ]
+    ]
+  },
+  "results": [
+    {
+      "variant": "scaled_goal",
+      "seed": 42,
+      "settings": {
+        "episodes": 1000,
+        "max_steps": 200,
+        "learning_rate": 0.1,
+        "discount_factor": 0.95,
+        "epsilon": 1.0,
+        "epsilon_decay": 0.995,
+        "min_epsilon": 0.05,
+        "seed": 42,
+        "cppo_hidden_size": 512,
+        "cppo_depth": 4,
+        "cppo_repr_dim": 64,
+        "cppo_rollout_steps": 128,
+        "cppo_batch_size": 256,
+        "cppo_epochs": 1,
+        "cppo_total_updates": 1250,
+        "cppo_learning_rate": 0.00025,
+        "cppo_gamma": 0.99,
+        "cppo_clip_coef": 0.2,
+        "cppo_entropy_coef": 0.01,
+        "cppo_max_grad_norm": 0.5,
+        "cppo_lr_end": 1e-07
+      },
+      "history": [
+        {
+          "episode": 1,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 69,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 2,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 63,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 3,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 68,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 4,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 57,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 5,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 94,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 6,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 97,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 7,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 91,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 8,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 101,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 9,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 125,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 10,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 97,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 11,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 128,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 12,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 107,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 13,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 139,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 14,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 127,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 15,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 151,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 16,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 169,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 17,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 163,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 18,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 151,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 19,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 169,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 20,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 167,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 21,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 165,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 22,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 168,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 23,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 185,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 24,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 25,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 173,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 26,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 187,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 27,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 181,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 28,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 180,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 29,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 187,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 30,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 181,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 31,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 32,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 189,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 33,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 185,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 34,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 185,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 35,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 36,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 185,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 37,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 190,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 38,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 39,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 40,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 194,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 41,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 198,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 42,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 196,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 43,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 198,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 44,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 45,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 198,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 46,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 47,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 194,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 48,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 49,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 50,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 51,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 52,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 53,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 54,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 55,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 56,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 57,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 198,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 58,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 198,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 59,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 198,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 60,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 61,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 62,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 63,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 198,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 64,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 65,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 66,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 67,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 68,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 69,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 70,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 71,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 72,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 73,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 74,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 75,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 198,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 76,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 77,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 78,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 79,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 80,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 81,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 82,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 83,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 84,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 85,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 86,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 87,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 88,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 89,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 90,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 91,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 92,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 93,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 94,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 95,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 96,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 97,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 98,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 99,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 100,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 101,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 102,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 103,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 104,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 105,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 106,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 107,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 108,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 109,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 110,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 111,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 112,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 113,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 114,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 198,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 115,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 196,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 116,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 117,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 118,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 119,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 196,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 120,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 121,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 196,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 122,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 123,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 194,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 124,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 196,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 125,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 126,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 185,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 127,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 159,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 128,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 181,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 129,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 152,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 130,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 170,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 131,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 140,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 132,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 137,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 133,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 122,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 134,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 96,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 135,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 57,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 136,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 71,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 137,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 95,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 138,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 96,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 139,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 133,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 140,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 150,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 141,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 157,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 142,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 149,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 143,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 151,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 144,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 165,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 145,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 160,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 146,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 143,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 147,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 147,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 148,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 149,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 150,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 183,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 151,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 187,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 152,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 179,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 153,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 173,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 154,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 179,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 155,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 185,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 156,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 157,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 175,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 158,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 186,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 159,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 179,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 160,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 176,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 161,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 183,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 162,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 181,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 163,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 185,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 164,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 178,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 165,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 166,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 194,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 167,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 168,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 192,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 169,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 194,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 170,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 196,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 171,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 188,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 172,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 173,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 198,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 174,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 175,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 198,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 176,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 177,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 178,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 196,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 179,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 180,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 181,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 182,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 183,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 184,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 199,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 185,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 186,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 198,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 187,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 188,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 189,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 190,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 191,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 192,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 193,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 194,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 195,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 196,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 197,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 198,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 199,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 200,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 200,
+          "moving_average_reward": 0.0
+        }
+      ],
+      "diagnostics": [
+        {
+          "variant": "scaled_goal",
+          "seed": 42,
+          "episode": 20,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.052476491779088974,
+            "down": 0.6788156032562256,
+            "left": 0.053547944873571396,
+            "right": 0.21515998244285583
+          },
+          "wall_entropy": 0.9049561980438381,
+          "metrics": {
+            "updates": 10,
+            "rollout_steps": 400,
+            "learning_rate": 0.0002499680366355947,
+            "contrastive_loss": 4.576674938201904,
+            "policy_loss": -0.025396483950316906,
+            "entropy": 0.9756816625595093
+          },
+          "seconds": 4.22
+        },
+        {
+          "variant": "scaled_goal",
+          "seed": 42,
+          "episode": 40,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.004922150168567896,
+            "down": 0.9733986854553223,
+            "left": 0.004762778989970684,
+            "right": 0.016916383057832718
+          },
+          "wall_entropy": 0.14687681439235573,
+          "metrics": {
+            "updates": 20,
+            "rollout_steps": 400,
+            "learning_rate": 0.0002498575669878868,
+            "contrastive_loss": 4.552863359451294,
+            "policy_loss": -0.00948436139151454,
+            "entropy": 0.1751699000597
+          },
+          "seconds": 7.14
+        },
+        {
+          "variant": "scaled_goal",
+          "seed": 42,
+          "episode": 60,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.0005856501520611346,
+            "down": 0.9973034858703613,
+            "left": 0.0004752741369884461,
+            "right": 0.001635573455132544
+          },
+          "wall_entropy": 0.0211818113717538,
+          "metrics": {
+            "updates": 30,
+            "rollout_steps": 400,
+            "learning_rate": 0.00024966826620581887,
+            "contrastive_loss": 4.414146661758423,
+            "policy_loss": -0.0029189817141741514,
+            "entropy": 0.023036440834403038
+          },
+          "seconds": 10.03
+        },
+        {
+          "variant": "scaled_goal",
+          "seed": 42,
+          "episode": 80,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.00023728414089418948,
+            "down": 0.9989288449287415,
+            "left": 0.00019020949548576027,
+            "right": 0.000643656705506146
+          },
+          "wall_entropy": 0.009410423909333028,
+          "metrics": {
+            "updates": 40,
+            "rollout_steps": 400,
+            "learning_rate": 0.00024940025385582215,
+            "contrastive_loss": 4.574386835098267,
+            "policy_loss": 0.0,
+            "entropy": 0.009399356320500374
+          },
+          "seconds": 12.97
+        },
+        {
+          "variant": "scaled_goal",
+          "seed": 42,
+          "episode": 100,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.00022995083418209106,
+            "down": 0.9988623857498169,
+            "left": 0.00017164541350211948,
+            "right": 0.0007359415758401155
+          },
+          "wall_entropy": 0.00986094014824223,
+          "metrics": {
+            "updates": 50,
+            "rollout_steps": 400,
+            "learning_rate": 0.0002490536992202414,
+            "contrastive_loss": 3.1939617395401,
+            "policy_loss": -0.0005608347128145397,
+            "entropy": 0.00975506566464901
+          },
+          "seconds": 15.88
+        },
+        {
+          "variant": "scaled_goal",
+          "seed": 42,
+          "episode": 120,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.007650954648852348,
+            "down": 0.960700511932373,
+            "left": 0.007125606294721365,
+            "right": 0.024522988125681877
+          },
+          "wall_entropy": 0.20196367785040442,
+          "metrics": {
+            "updates": 60,
+            "rollout_steps": 400,
+            "learning_rate": 0.00024862882119041214,
+            "contrastive_loss": 4.468289852142334,
+            "policy_loss": 0.009205946698784828,
+            "entropy": 0.1633262261748314
+          },
+          "seconds": 18.72
+        },
+        {
+          "variant": "scaled_goal",
+          "seed": 42,
+          "episode": 140,
+          "successes": 0,
+          "visited": 19,
+          "wall_policy": {
+            "up": 0.3163774311542511,
+            "down": 0.02481697127223015,
+            "left": 0.5546953678131104,
+            "right": 0.10411017388105392
+          },
+          "wall_entropy": 1.0182535390300247,
+          "metrics": {
+            "updates": 70,
+            "rollout_steps": 400,
+            "learning_rate": 0.0002481258881284048,
+            "contrastive_loss": 4.5740368366241455,
+            "policy_loss": -0.02178137842565775,
+            "entropy": 1.0955918431282043
+          },
+          "seconds": 21.53
+        },
+        {
+          "variant": "scaled_goal",
+          "seed": 42,
+          "episode": 160,
+          "successes": 0,
+          "visited": 19,
+          "wall_policy": {
+            "up": 0.006853489205241203,
+            "down": 0.00023380150378216058,
+            "left": 0.9543277621269226,
+            "right": 0.038584884256124496
+          },
+          "wall_entropy": 0.20630848650745054,
+          "metrics": {
+            "updates": 80,
+            "rollout_steps": 400,
+            "learning_rate": 0.0002475452176975208,
+            "contrastive_loss": 4.570245265960693,
+            "policy_loss": -0.007681592600420117,
+            "entropy": 0.2339169904589653
+          },
+          "seconds": 24.44
+        },
+        {
+          "variant": "scaled_goal",
+          "seed": 42,
+          "episode": 180,
+          "successes": 0,
+          "visited": 19,
+          "wall_policy": {
+            "up": 0.00022897240705788136,
+            "down": 1.414812413713662e-05,
+            "left": 0.9985565543174744,
+            "right": 0.0012003722367808223
+          },
+          "wall_entropy": 0.011592257873849295,
+          "metrics": {
+            "updates": 90,
+            "rollout_steps": 400,
+            "learning_rate": 0.00024688717666165004,
+            "contrastive_loss": 4.574387311935425,
+            "policy_loss": -0.003956502303481102,
+            "entropy": 0.014156344812363386
+          },
+          "seconds": 27.34
+        },
+        {
+          "variant": "scaled_goal",
+          "seed": 42,
+          "episode": 200,
+          "successes": 0,
+          "visited": 19,
+          "wall_policy": {
+            "up": 6.762139673810452e-05,
+            "down": 3.2642540190863656e-06,
+            "left": 0.9996951818466187,
+            "right": 0.00023395456082653254
+          },
+          "wall_entropy": 0.002951229860499148,
+          "metrics": {
+            "updates": 100,
+            "rollout_steps": 400,
+            "learning_rate": 0.0002461521806536148,
+            "contrastive_loss": 4.574386835098267,
+            "policy_loss": 0.0,
+            "entropy": 0.0030380809912458062
+          },
+          "seconds": 30.19
+        }
+      ]
+    },
+    {
+      "variant": "strong_entropy",
+      "seed": 42,
+      "settings": {
+        "episodes": 1000,
+        "max_steps": 200,
+        "learning_rate": 0.1,
+        "discount_factor": 0.95,
+        "epsilon": 1.0,
+        "epsilon_decay": 0.995,
+        "min_epsilon": 0.05,
+        "seed": 42,
+        "cppo_entropy_coef": 1.0,
+        "cppo_hidden_size": 512,
+        "cppo_depth": 4,
+        "cppo_repr_dim": 64,
+        "cppo_rollout_steps": 128,
+        "cppo_batch_size": 256,
+        "cppo_epochs": 1,
+        "cppo_total_updates": 1250,
+        "cppo_learning_rate": 0.00025,
+        "cppo_gamma": 0.99,
+        "cppo_clip_coef": 0.2,
+        "cppo_max_grad_norm": 0.5,
+        "cppo_lr_end": 1e-07
+      },
+      "history": [
+        {
+          "episode": 1,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 69,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 2,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 63,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 3,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 70,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 4,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 57,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 5,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 96,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 6,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 99,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 7,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 91,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 8,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 114,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 9,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 135,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 10,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 105,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 11,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 136,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 12,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 113,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 13,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 143,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 14,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 155,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 15,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 157,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 16,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 17,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 175,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 18,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 163,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 19,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 179,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 20,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 173,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 21,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 181,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 22,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 179,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 23,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 189,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 24,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 25,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 26,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 27,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 187,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 28,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 184,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 29,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 30,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 179,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 31,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 32,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 189,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 33,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 34,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 35,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 36,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 187,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 37,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 192,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 38,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 39,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 40,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 41,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 185,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 42,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 43,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 44,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 192,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 45,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 46,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 47,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 48,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 49,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 50,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 51,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 189,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 52,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 53,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 54,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 55,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 56,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 187,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 57,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 58,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 59,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 60,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 61,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 62,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 63,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 64,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 65,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 66,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 67,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 68,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 69,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 70,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 71,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 72,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 73,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 74,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 75,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 76,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 77,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 78,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 187,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 79,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 80,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 81,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 82,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 83,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 84,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 85,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 86,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 87,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 88,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 189,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 89,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 90,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 91,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 92,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 93,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 94,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 95,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 96,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 97,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 98,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 99,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 100,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 101,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 102,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 189,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 103,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 104,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 105,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 106,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 107,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 194,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 108,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 109,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 189,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 110,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 179,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 111,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 181,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 112,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 184,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 113,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 187,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 114,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 115,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 175,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 116,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 187,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 117,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 182,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 118,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 119,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 171,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 120,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 171,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 121,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 153,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 122,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 166,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 123,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 159,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 124,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 149,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 125,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 113,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 126,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 143,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 127,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 127,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 128,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 153,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 129,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 159,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 130,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 165,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 131,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 132,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 171,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 133,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 181,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 134,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 185,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 135,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 189,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 136,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 137,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 179,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 138,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 185,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 139,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 188,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 140,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 181,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 141,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 187,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 142,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 143,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 144,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 145,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 183,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 146,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 147,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 148,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 149,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 150,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 187,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 151,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 152,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 153,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 154,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 185,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 155,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 156,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 185,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 157,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 158,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 159,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 160,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 191,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 161,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 193,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 162,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 187,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 163,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 164,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 165,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 166,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 187,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 167,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 168,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 169,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 197,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 170,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 171,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 195,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 172,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 171,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 173,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 175,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 174,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 181,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 175,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 177,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 176,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 159,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 177,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 169,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 178,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 154,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 179,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 133,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 180,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 140,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 181,
+          "steps": 134,
+          "reward": 1,
+          "cumulative_reward": 1,
+          "success": true,
+          "collisions": 90,
+          "moving_average_reward": 0.01
+        },
+        {
+          "episode": 182,
+          "steps": 160,
+          "reward": 1,
+          "cumulative_reward": 2,
+          "success": true,
+          "collisions": 102,
+          "moving_average_reward": 0.02
+        },
+        {
+          "episode": 183,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 2,
+          "success": false,
+          "collisions": 128,
+          "moving_average_reward": 0.02
+        },
+        {
+          "episode": 184,
+          "steps": 185,
+          "reward": 1,
+          "cumulative_reward": 3,
+          "success": true,
+          "collisions": 133,
+          "moving_average_reward": 0.03
+        },
+        {
+          "episode": 185,
+          "steps": 106,
+          "reward": 1,
+          "cumulative_reward": 4,
+          "success": true,
+          "collisions": 54,
+          "moving_average_reward": 0.04
+        },
+        {
+          "episode": 186,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 4,
+          "success": false,
+          "collisions": 161,
+          "moving_average_reward": 0.04
+        },
+        {
+          "episode": 187,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 4,
+          "success": false,
+          "collisions": 169,
+          "moving_average_reward": 0.04
+        },
+        {
+          "episode": 188,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 4,
+          "success": false,
+          "collisions": 143,
+          "moving_average_reward": 0.04
+        },
+        {
+          "episode": 189,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 4,
+          "success": false,
+          "collisions": 147,
+          "moving_average_reward": 0.04
+        },
+        {
+          "episode": 190,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 4,
+          "success": false,
+          "collisions": 125,
+          "moving_average_reward": 0.04
+        },
+        {
+          "episode": 191,
+          "steps": 188,
+          "reward": 1,
+          "cumulative_reward": 5,
+          "success": true,
+          "collisions": 84,
+          "moving_average_reward": 0.05
+        },
+        {
+          "episode": 192,
+          "steps": 48,
+          "reward": 1,
+          "cumulative_reward": 6,
+          "success": true,
+          "collisions": 14,
+          "moving_average_reward": 0.06
+        },
+        {
+          "episode": 193,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 6,
+          "success": false,
+          "collisions": 133,
+          "moving_average_reward": 0.06
+        },
+        {
+          "episode": 194,
+          "steps": 83,
+          "reward": 1,
+          "cumulative_reward": 7,
+          "success": true,
+          "collisions": 27,
+          "moving_average_reward": 0.07
+        },
+        {
+          "episode": 195,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 7,
+          "success": false,
+          "collisions": 163,
+          "moving_average_reward": 0.07
+        },
+        {
+          "episode": 196,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 7,
+          "success": false,
+          "collisions": 72,
+          "moving_average_reward": 0.07
+        },
+        {
+          "episode": 197,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 7,
+          "success": false,
+          "collisions": 147,
+          "moving_average_reward": 0.07
+        },
+        {
+          "episode": 198,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 7,
+          "success": false,
+          "collisions": 175,
+          "moving_average_reward": 0.07
+        },
+        {
+          "episode": 199,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 7,
+          "success": false,
+          "collisions": 147,
+          "moving_average_reward": 0.07
+        },
+        {
+          "episode": 200,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 7,
+          "success": false,
+          "collisions": 145,
+          "moving_average_reward": 0.07
+        }
+      ],
+      "diagnostics": [
+        {
+          "variant": "strong_entropy",
+          "seed": 42,
+          "episode": 20,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.043636105954647064,
+            "down": 0.4971798360347748,
+            "left": 0.03725937381386757,
+            "right": 0.4219247102737427
+          },
+          "wall_entropy": 0.9707622508164703,
+          "metrics": {
+            "updates": 10,
+            "rollout_steps": 400,
+            "learning_rate": 0.0002499680366355947,
+            "contrastive_loss": 4.5742292404174805,
+            "policy_loss": -0.017764173448085785,
+            "entropy": 1.0014962255954742
+          },
+          "seconds": 3.06
+        },
+        {
+          "variant": "strong_entropy",
+          "seed": 42,
+          "episode": 40,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.015688445419073105,
+            "down": 0.7881547212600708,
+            "left": 0.0063570477068424225,
+            "right": 0.18979983031749725
+          },
+          "wall_entropy": 0.6003733565070866,
+          "metrics": {
+            "updates": 20,
+            "rollout_steps": 400,
+            "learning_rate": 0.0002498575669878868,
+            "contrastive_loss": 4.558295965194702,
+            "policy_loss": -0.004164524842053652,
+            "entropy": 0.5858449041843414
+          },
+          "seconds": 5.97
+        },
+        {
+          "variant": "strong_entropy",
+          "seed": 42,
+          "episode": 60,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.01601620391011238,
+            "down": 0.22648818790912628,
+            "left": 0.006612798664718866,
+            "right": 0.7508828043937683
+          },
+          "wall_entropy": 0.6508827397801749,
+          "metrics": {
+            "updates": 30,
+            "rollout_steps": 400,
+            "learning_rate": 0.00024966826620581887,
+            "contrastive_loss": 4.555618762969971,
+            "policy_loss": -0.023462860845029354,
+            "entropy": 0.7048786878585815
+          },
+          "seconds": 8.81
+        },
+        {
+          "variant": "strong_entropy",
+          "seed": 42,
+          "episode": 80,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.015167074277997017,
+            "down": 0.4765816032886505,
+            "left": 0.007677958346903324,
+            "right": 0.5005733966827393
+          },
+          "wall_entropy": 0.8005160151152058,
+          "metrics": {
+            "updates": 40,
+            "rollout_steps": 400,
+            "learning_rate": 0.00024940025385582215,
+            "contrastive_loss": 4.574428081512451,
+            "policy_loss": -0.026368009857833385,
+            "entropy": 0.7754392027854919
+          },
+          "seconds": 11.86
+        },
+        {
+          "variant": "strong_entropy",
+          "seed": 42,
+          "episode": 100,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.015812136232852936,
+            "down": 0.9032005667686462,
+            "left": 0.00561869889497757,
+            "right": 0.07536864280700684
+          },
+          "wall_entropy": 0.381497533536578,
+          "metrics": {
+            "updates": 50,
+            "rollout_steps": 400,
+            "learning_rate": 0.0002490536992202414,
+            "contrastive_loss": 4.569622039794922,
+            "policy_loss": -0.0030875217635184526,
+            "entropy": 0.3783664405345917
+          },
+          "seconds": 14.92
+        },
+        {
+          "variant": "strong_entropy",
+          "seed": 42,
+          "episode": 120,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.1938697248697281,
+            "down": 0.4109821021556854,
+            "left": 0.06837393343448639,
+            "right": 0.3267742097377777
+          },
+          "wall_entropy": 1.232427653068982,
+          "metrics": {
+            "updates": 60,
+            "rollout_steps": 400,
+            "learning_rate": 0.00024862882119041214,
+            "contrastive_loss": 4.570089101791382,
+            "policy_loss": -0.012983919470570982,
+            "entropy": 1.1602917313575745
+          },
+          "seconds": 17.91
+        },
+        {
+          "variant": "strong_entropy",
+          "seed": 42,
+          "episode": 140,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.10095860064029694,
+            "down": 0.10898150503635406,
+            "left": 0.009707310236990452,
+            "right": 0.7803525924682617
+          },
+          "wall_entropy": 0.7115954688877217,
+          "metrics": {
+            "updates": 70,
+            "rollout_steps": 400,
+            "learning_rate": 0.0002481258881284048,
+            "contrastive_loss": 4.567262649536133,
+            "policy_loss": -0.0027739882934838533,
+            "entropy": 0.7157628536224365
+          },
+          "seconds": 20.95
+        },
+        {
+          "variant": "strong_entropy",
+          "seed": 42,
+          "episode": 160,
+          "successes": 0,
+          "visited": 13,
+          "wall_policy": {
+            "up": 0.11846087127923965,
+            "down": 0.10989157110452652,
+            "left": 0.004493756219744682,
+            "right": 0.7671538591384888
+          },
+          "wall_entropy": 0.7230036773873231,
+          "metrics": {
+            "updates": 80,
+            "rollout_steps": 400,
+            "learning_rate": 0.0002475452176975208,
+            "contrastive_loss": 4.56629753112793,
+            "policy_loss": 0.0018646185053512454,
+            "entropy": 0.7092066705226898
+          },
+          "seconds": 23.91
+        },
+        {
+          "variant": "strong_entropy",
+          "seed": 42,
+          "episode": 180,
+          "successes": 0,
+          "visited": 37,
+          "wall_policy": {
+            "up": 0.6555724740028381,
+            "down": 0.11266026645898819,
+            "left": 0.010546357370913029,
+            "right": 0.22122091054916382
+          },
+          "wall_entropy": 0.904532306987665,
+          "metrics": {
+            "updates": 90,
+            "rollout_steps": 400,
+            "learning_rate": 0.00024688717666165004,
+            "contrastive_loss": 9.192183017730713,
+            "policy_loss": -0.02476428635418415,
+            "entropy": 0.9388779997825623
+          },
+          "seconds": 26.97
+        },
+        {
+          "variant": "strong_entropy",
+          "seed": 42,
+          "episode": 200,
+          "successes": 7,
+          "visited": 49,
+          "wall_policy": {
+            "up": 0.28349587321281433,
+            "down": 0.5412904024124146,
+            "left": 0.023118937388062477,
+            "right": 0.1520947962999344
+          },
+          "wall_entropy": 1.0631307545102584,
+          "metrics": {
+            "updates": 100,
+            "rollout_steps": 400,
+            "learning_rate": 0.0002461521806536148,
+            "contrastive_loss": 4.573371171951294,
+            "policy_loss": -0.01294534932821989,
+            "entropy": 1.084600806236267
+          },
+          "seconds": 29.75
+        }
+      ]
+    },
+    {
+      "variant": "raw_more_data_entropy",
+      "seed": 42,
+      "settings": {
+        "episodes": 1000,
+        "max_steps": 200,
+        "learning_rate": 0.1,
+        "discount_factor": 0.95,
+        "epsilon": 1.0,
+        "epsilon_decay": 0.995,
+        "min_epsilon": 0.05,
+        "seed": 42,
+        "cppo_rollout_steps": 4096,
+        "cppo_entropy_coef": 0.1,
+        "cppo_hidden_size": 512,
+        "cppo_depth": 4,
+        "cppo_repr_dim": 64,
+        "cppo_batch_size": 256,
+        "cppo_epochs": 1,
+        "cppo_total_updates": 1250,
+        "cppo_learning_rate": 0.00025,
+        "cppo_gamma": 0.99,
+        "cppo_clip_coef": 0.2,
+        "cppo_max_grad_norm": 0.5,
+        "cppo_lr_end": 1e-07
+      },
+      "history": [
+        {
+          "episode": 1,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 69,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 2,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 63,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 3,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 81,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 4,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 69,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 5,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 72,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 6,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 85,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 7,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 68,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 8,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 63,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 9,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 60,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 10,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 63,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 11,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 68,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 12,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 68,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 13,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 82,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 14,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 67,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 15,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 81,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 16,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 69,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 17,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 74,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 18,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 72,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 19,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 46,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 20,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 72,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 21,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 42,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 22,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 87,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 23,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 82,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 24,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 97,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 25,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 80,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 26,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 68,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 27,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 70,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 28,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 69,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 29,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 63,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 30,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 98,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 31,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 68,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 32,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 81,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 33,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 88,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 34,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 85,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 35,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 83,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 36,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 86,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 37,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 67,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 38,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 63,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 39,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 63,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 40,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 90,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 41,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 78,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 42,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 79,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 43,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 117,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 44,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 97,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 45,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 99,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 46,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 117,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 47,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 91,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 48,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 96,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 49,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 128,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 50,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 117,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 51,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 134,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 52,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 99,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 53,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 130,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 54,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 123,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 55,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 123,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 56,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 105,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 57,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 115,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 58,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 99,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 59,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 110,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 60,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 125,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 61,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 98,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 62,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 97,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 63,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 85,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 64,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 77,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 65,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 72,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 66,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 64,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 67,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 78,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 68,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 66,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 69,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 81,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 70,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 51,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 71,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 51,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 72,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 71,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 73,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 65,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 74,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 74,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 75,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 69,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 76,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 79,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 77,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 70,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 78,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 72,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 79,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 77,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 80,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 74,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 81,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 68,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 82,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 76,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 83,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 89,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 84,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 82,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 85,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 55,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 86,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 75,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 87,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 60,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 88,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 55,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 89,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 66,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 90,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 76,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 91,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 101,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 92,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 64,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 93,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 97,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 94,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 74,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 95,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 65,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 96,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 72,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 97,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 0,
+          "success": false,
+          "collisions": 98,
+          "moving_average_reward": 0.0
+        },
+        {
+          "episode": 98,
+          "steps": 87,
+          "reward": 1,
+          "cumulative_reward": 1,
+          "success": true,
+          "collisions": 35,
+          "moving_average_reward": 0.01020408163265306
+        },
+        {
+          "episode": 99,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 1,
+          "success": false,
+          "collisions": 82,
+          "moving_average_reward": 0.010101010101010102
+        },
+        {
+          "episode": 100,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 1,
+          "success": false,
+          "collisions": 91,
+          "moving_average_reward": 0.01
+        },
+        {
+          "episode": 101,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 1,
+          "success": false,
+          "collisions": 97,
+          "moving_average_reward": 0.01
+        },
+        {
+          "episode": 102,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 1,
+          "success": false,
+          "collisions": 88,
+          "moving_average_reward": 0.01
+        },
+        {
+          "episode": 103,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 1,
+          "success": false,
+          "collisions": 85,
+          "moving_average_reward": 0.01
+        },
+        {
+          "episode": 104,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 1,
+          "success": false,
+          "collisions": 76,
+          "moving_average_reward": 0.01
+        },
+        {
+          "episode": 105,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 1,
+          "success": false,
+          "collisions": 81,
+          "moving_average_reward": 0.01
+        },
+        {
+          "episode": 106,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 1,
+          "success": false,
+          "collisions": 86,
+          "moving_average_reward": 0.01
+        },
+        {
+          "episode": 107,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 1,
+          "success": false,
+          "collisions": 100,
+          "moving_average_reward": 0.01
+        },
+        {
+          "episode": 108,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 1,
+          "success": false,
+          "collisions": 99,
+          "moving_average_reward": 0.01
+        },
+        {
+          "episode": 109,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 1,
+          "success": false,
+          "collisions": 100,
+          "moving_average_reward": 0.01
+        },
+        {
+          "episode": 110,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 1,
+          "success": false,
+          "collisions": 79,
+          "moving_average_reward": 0.01
+        },
+        {
+          "episode": 111,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 1,
+          "success": false,
+          "collisions": 91,
+          "moving_average_reward": 0.01
+        },
+        {
+          "episode": 112,
+          "steps": 138,
+          "reward": 1,
+          "cumulative_reward": 2,
+          "success": true,
+          "collisions": 66,
+          "moving_average_reward": 0.02
+        },
+        {
+          "episode": 113,
+          "steps": 151,
+          "reward": 1,
+          "cumulative_reward": 3,
+          "success": true,
+          "collisions": 57,
+          "moving_average_reward": 0.03
+        },
+        {
+          "episode": 114,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 3,
+          "success": false,
+          "collisions": 109,
+          "moving_average_reward": 0.03
+        },
+        {
+          "episode": 115,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 3,
+          "success": false,
+          "collisions": 100,
+          "moving_average_reward": 0.03
+        },
+        {
+          "episode": 116,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 3,
+          "success": false,
+          "collisions": 93,
+          "moving_average_reward": 0.03
+        },
+        {
+          "episode": 117,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 3,
+          "success": false,
+          "collisions": 100,
+          "moving_average_reward": 0.03
+        },
+        {
+          "episode": 118,
+          "steps": 163,
+          "reward": 1,
+          "cumulative_reward": 4,
+          "success": true,
+          "collisions": 61,
+          "moving_average_reward": 0.04
+        },
+        {
+          "episode": 119,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 4,
+          "success": false,
+          "collisions": 86,
+          "moving_average_reward": 0.04
+        },
+        {
+          "episode": 120,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 4,
+          "success": false,
+          "collisions": 95,
+          "moving_average_reward": 0.04
+        },
+        {
+          "episode": 121,
+          "steps": 198,
+          "reward": 1,
+          "cumulative_reward": 5,
+          "success": true,
+          "collisions": 74,
+          "moving_average_reward": 0.05
+        },
+        {
+          "episode": 122,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 5,
+          "success": false,
+          "collisions": 89,
+          "moving_average_reward": 0.05
+        },
+        {
+          "episode": 123,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 5,
+          "success": false,
+          "collisions": 89,
+          "moving_average_reward": 0.05
+        },
+        {
+          "episode": 124,
+          "steps": 189,
+          "reward": 1,
+          "cumulative_reward": 6,
+          "success": true,
+          "collisions": 85,
+          "moving_average_reward": 0.06
+        },
+        {
+          "episode": 125,
+          "steps": 153,
+          "reward": 1,
+          "cumulative_reward": 7,
+          "success": true,
+          "collisions": 63,
+          "moving_average_reward": 0.07
+        },
+        {
+          "episode": 126,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 7,
+          "success": false,
+          "collisions": 98,
+          "moving_average_reward": 0.07
+        },
+        {
+          "episode": 127,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 7,
+          "success": false,
+          "collisions": 90,
+          "moving_average_reward": 0.07
+        },
+        {
+          "episode": 128,
+          "steps": 93,
+          "reward": 1,
+          "cumulative_reward": 8,
+          "success": true,
+          "collisions": 43,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 129,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 113,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 130,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 105,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 131,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 111,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 132,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 131,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 133,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 86,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 134,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 110,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 135,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 101,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 136,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 100,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 137,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 113,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 138,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 111,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 139,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 97,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 140,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 103,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 141,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 114,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 142,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 8,
+          "success": false,
+          "collisions": 111,
+          "moving_average_reward": 0.08
+        },
+        {
+          "episode": 143,
+          "steps": 198,
+          "reward": 1,
+          "cumulative_reward": 9,
+          "success": true,
+          "collisions": 108,
+          "moving_average_reward": 0.09
+        },
+        {
+          "episode": 144,
+          "steps": 128,
+          "reward": 1,
+          "cumulative_reward": 10,
+          "success": true,
+          "collisions": 50,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 145,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 99,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 146,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 93,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 147,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 119,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 148,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 121,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 149,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 105,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 150,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 117,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 151,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 125,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 152,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 138,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 153,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 141,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 154,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 126,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 155,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 126,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 156,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 115,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 157,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 108,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 158,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 117,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 159,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 131,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 160,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 118,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 161,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 125,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 162,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 133,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 163,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 119,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 164,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 10,
+          "success": false,
+          "collisions": 118,
+          "moving_average_reward": 0.1
+        },
+        {
+          "episode": 165,
+          "steps": 168,
+          "reward": 1,
+          "cumulative_reward": 11,
+          "success": true,
+          "collisions": 78,
+          "moving_average_reward": 0.11
+        },
+        {
+          "episode": 166,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 11,
+          "success": false,
+          "collisions": 120,
+          "moving_average_reward": 0.11
+        },
+        {
+          "episode": 167,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 11,
+          "success": false,
+          "collisions": 122,
+          "moving_average_reward": 0.11
+        },
+        {
+          "episode": 168,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 11,
+          "success": false,
+          "collisions": 140,
+          "moving_average_reward": 0.11
+        },
+        {
+          "episode": 169,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 11,
+          "success": false,
+          "collisions": 131,
+          "moving_average_reward": 0.11
+        },
+        {
+          "episode": 170,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 11,
+          "success": false,
+          "collisions": 124,
+          "moving_average_reward": 0.11
+        },
+        {
+          "episode": 171,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 11,
+          "success": false,
+          "collisions": 120,
+          "moving_average_reward": 0.11
+        },
+        {
+          "episode": 172,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 11,
+          "success": false,
+          "collisions": 134,
+          "moving_average_reward": 0.11
+        },
+        {
+          "episode": 173,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 11,
+          "success": false,
+          "collisions": 142,
+          "moving_average_reward": 0.11
+        },
+        {
+          "episode": 174,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 11,
+          "success": false,
+          "collisions": 181,
+          "moving_average_reward": 0.11
+        },
+        {
+          "episode": 175,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 11,
+          "success": false,
+          "collisions": 157,
+          "moving_average_reward": 0.11
+        },
+        {
+          "episode": 176,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 11,
+          "success": false,
+          "collisions": 132,
+          "moving_average_reward": 0.11
+        },
+        {
+          "episode": 177,
+          "steps": 173,
+          "reward": 1,
+          "cumulative_reward": 12,
+          "success": true,
+          "collisions": 97,
+          "moving_average_reward": 0.12
+        },
+        {
+          "episode": 178,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 12,
+          "success": false,
+          "collisions": 144,
+          "moving_average_reward": 0.12
+        },
+        {
+          "episode": 179,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 12,
+          "success": false,
+          "collisions": 130,
+          "moving_average_reward": 0.12
+        },
+        {
+          "episode": 180,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 12,
+          "success": false,
+          "collisions": 132,
+          "moving_average_reward": 0.12
+        },
+        {
+          "episode": 181,
+          "steps": 172,
+          "reward": 1,
+          "cumulative_reward": 13,
+          "success": true,
+          "collisions": 102,
+          "moving_average_reward": 0.13
+        },
+        {
+          "episode": 182,
+          "steps": 194,
+          "reward": 1,
+          "cumulative_reward": 14,
+          "success": true,
+          "collisions": 118,
+          "moving_average_reward": 0.14
+        },
+        {
+          "episode": 183,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 14,
+          "success": false,
+          "collisions": 132,
+          "moving_average_reward": 0.14
+        },
+        {
+          "episode": 184,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 14,
+          "success": false,
+          "collisions": 126,
+          "moving_average_reward": 0.14
+        },
+        {
+          "episode": 185,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 14,
+          "success": false,
+          "collisions": 106,
+          "moving_average_reward": 0.14
+        },
+        {
+          "episode": 186,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 14,
+          "success": false,
+          "collisions": 151,
+          "moving_average_reward": 0.14
+        },
+        {
+          "episode": 187,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 14,
+          "success": false,
+          "collisions": 142,
+          "moving_average_reward": 0.14
+        },
+        {
+          "episode": 188,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 14,
+          "success": false,
+          "collisions": 112,
+          "moving_average_reward": 0.14
+        },
+        {
+          "episode": 189,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 14,
+          "success": false,
+          "collisions": 155,
+          "moving_average_reward": 0.14
+        },
+        {
+          "episode": 190,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 14,
+          "success": false,
+          "collisions": 117,
+          "moving_average_reward": 0.14
+        },
+        {
+          "episode": 191,
+          "steps": 46,
+          "reward": 1,
+          "cumulative_reward": 15,
+          "success": true,
+          "collisions": 12,
+          "moving_average_reward": 0.15
+        },
+        {
+          "episode": 192,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 15,
+          "success": false,
+          "collisions": 147,
+          "moving_average_reward": 0.15
+        },
+        {
+          "episode": 193,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 15,
+          "success": false,
+          "collisions": 181,
+          "moving_average_reward": 0.15
+        },
+        {
+          "episode": 194,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 15,
+          "success": false,
+          "collisions": 125,
+          "moving_average_reward": 0.15
+        },
+        {
+          "episode": 195,
+          "steps": 155,
+          "reward": 1,
+          "cumulative_reward": 16,
+          "success": true,
+          "collisions": 73,
+          "moving_average_reward": 0.16
+        },
+        {
+          "episode": 196,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 16,
+          "success": false,
+          "collisions": 128,
+          "moving_average_reward": 0.16
+        },
+        {
+          "episode": 197,
+          "steps": 162,
+          "reward": 1,
+          "cumulative_reward": 17,
+          "success": true,
+          "collisions": 82,
+          "moving_average_reward": 0.17
+        },
+        {
+          "episode": 198,
+          "steps": 173,
+          "reward": 1,
+          "cumulative_reward": 18,
+          "success": true,
+          "collisions": 83,
+          "moving_average_reward": 0.17
+        },
+        {
+          "episode": 199,
+          "steps": 200,
+          "reward": 0,
+          "cumulative_reward": 18,
+          "success": false,
+          "collisions": 93,
+          "moving_average_reward": 0.17
+        },
+        {
+          "episode": 200,
+          "steps": 170,
+          "reward": 1,
+          "cumulative_reward": 19,
+          "success": true,
+          "collisions": 100,
+          "moving_average_reward": 0.18
+        }
+      ],
+      "diagnostics": [
+        {
+          "variant": "raw_more_data_entropy",
+          "seed": 42,
+          "episode": 20,
+          "successes": 0,
+          "visited": 52,
+          "wall_policy": {
+            "up": 0.24988403916358948,
+            "down": 0.24923662841320038,
+            "left": 0.25090423226356506,
+            "right": 0.2499750852584839
+          },
+          "wall_entropy": 1.3862915272597345,
+          "metrics": {},
+          "seconds": 1.55
+        },
+        {
+          "variant": "raw_more_data_entropy",
+          "seed": 42,
+          "episode": 40,
+          "successes": 0,
+          "visited": 52,
+          "wall_policy": {
+            "up": 0.20144356787204742,
+            "down": 0.2885720729827881,
+            "left": 0.22073812782764435,
+            "right": 0.28924623131752014
+          },
+          "wall_entropy": 1.3736921618509452,
+          "metrics": {
+            "updates": 1,
+            "rollout_steps": 4200,
+            "learning_rate": 0.00025,
+            "contrastive_loss": 5.464251462151022,
+            "policy_loss": -0.013333854333990636,
+            "entropy": 1.364101297715131
+          },
+          "seconds": 4.67
+        },
+        {
+          "variant": "raw_more_data_entropy",
+          "seed": 42,
+          "episode": 60,
+          "successes": 0,
+          "visited": 52,
+          "wall_policy": {
+            "up": 0.16824786365032196,
+            "down": 0.34145739674568176,
+            "left": 0.1552673578262329,
+            "right": 0.3350273370742798
+          },
+          "wall_entropy": 1.3223469303851407,
+          "metrics": {
+            "updates": 2,
+            "rollout_steps": 4200,
+            "learning_rate": 0.00024999960537394535,
+            "contrastive_loss": 5.409186419318704,
+            "policy_loss": -0.020906272563425934,
+            "entropy": 1.3307500446543974
+          },
+          "seconds": 7.72
+        },
+        {
+          "variant": "raw_more_data_entropy",
+          "seed": 42,
+          "episode": 80,
+          "successes": 0,
+          "visited": 52,
+          "wall_policy": {
+            "up": 0.227164626121521,
+            "down": 0.2844277024269104,
+            "left": 0.29187893867492676,
+            "right": 0.19652876257896423
+          },
+          "wall_entropy": 1.373446612039183,
+          "metrics": {
+            "updates": 3,
+            "rollout_steps": 4200,
+            "learning_rate": 0.0002499984214982741,
+            "contrastive_loss": 5.441059252795051,
+            "policy_loss": -0.05712412544252241,
+            "entropy": 1.3661168042351217
+          },
+          "seconds": 10.73
+        },
+        {
+          "variant": "raw_more_data_entropy",
+          "seed": 42,
+          "episode": 100,
+          "successes": 1,
+          "visited": 56,
+          "wall_policy": {
+            "up": 0.239363431930542,
+            "down": 0.19860470294952393,
+            "left": 0.21520501375198364,
+            "right": 0.3468269109725952
+          },
+          "wall_entropy": 1.361123002790625,
+          "metrics": {
+            "updates": 4,
+            "rollout_steps": 4200,
+            "learning_rate": 0.0002499964483804642,
+            "contrastive_loss": 5.46118548337151,
+            "policy_loss": -0.04299432616886299,
+            "entropy": 1.374447177438175
+          },
+          "seconds": 13.81
+        },
+        {
+          "variant": "raw_more_data_entropy",
+          "seed": 42,
+          "episode": 120,
+          "successes": 4,
+          "visited": 56,
+          "wall_policy": {
+            "up": 0.3818229138851166,
+            "down": 0.11725234240293503,
+            "left": 0.17051824927330017,
+            "right": 0.3304065763950348
+          },
+          "wall_entropy": 1.2864748325753277,
+          "metrics": {
+            "updates": 5,
+            "rollout_steps": 4287,
+            "learning_rate": 0.0002499936860329789,
+            "contrastive_loss": 5.257674609913545,
+            "policy_loss": -0.02820950176785974,
+            "entropy": 1.3205981324700748
+          },
+          "seconds": 16.98
+        },
+        {
+          "variant": "raw_more_data_entropy",
+          "seed": 42,
+          "episode": 140,
+          "successes": 8,
+          "visited": 56,
+          "wall_policy": {
+            "up": 0.5535609722137451,
+            "down": 0.12463779747486115,
+            "left": 0.10602787882089615,
+            "right": 0.21577325463294983
+          },
+          "wall_entropy": 1.1557317976685957,
+          "metrics": {
+            "updates": 6,
+            "rollout_steps": 4285,
+            "learning_rate": 0.00024999013447326684,
+            "contrastive_loss": 5.272713352652157,
+            "policy_loss": -0.020828988361994132,
+            "entropy": 1.2264432556488936
+          },
+          "seconds": 20.03
+        },
+        {
+          "variant": "raw_more_data_entropy",
+          "seed": 42,
+          "episode": 160,
+          "successes": 10,
+          "visited": 56,
+          "wall_policy": {
+            "up": 0.6551164984703064,
+            "down": 0.10845326632261276,
+            "left": 0.06613511592149734,
+            "right": 0.17029517889022827
+          },
+          "wall_entropy": 0.9990853066157883,
+          "metrics": {
+            "updates": 7,
+            "rollout_steps": 4126,
+            "learning_rate": 0.00024998579372376145,
+            "contrastive_loss": 5.128068166620591,
+            "policy_loss": -0.030056768206550795,
+            "entropy": 1.0298808848156649
+          },
+          "seconds": 23.28
+        },
+        {
+          "variant": "raw_more_data_entropy",
+          "seed": 42,
+          "episode": 180,
+          "successes": 12,
+          "visited": 56,
+          "wall_policy": {
+            "up": 0.45364809036254883,
+            "down": 0.1489894986152649,
+            "left": 0.044803593307733536,
+            "right": 0.35255885124206543
+          },
+          "wall_entropy": 1.148928676432845,
+          "metrics": {
+            "updates": 8,
+            "rollout_steps": 4168,
+            "learning_rate": 0.00024998066381188135,
+            "contrastive_loss": 5.0110714155084946,
+            "policy_loss": -0.004948647281921962,
+            "entropy": 1.1278409256654627
+          },
+          "seconds": 26.59
+        },
+        {
+          "variant": "raw_more_data_entropy",
+          "seed": 42,
+          "episode": 200,
+          "successes": 19,
+          "visited": 56,
+          "wall_policy": {
+            "up": 0.5299944281578064,
+            "down": 0.20146051049232483,
+            "left": 0.04462004825472832,
+            "right": 0.22392497956752777
+          },
+          "wall_entropy": 1.1331003609764847,
+          "metrics": {
+            "updates": 9,
+            "rollout_steps": 4185,
+            "learning_rate": 0.0002499747447700298,
+            "contrastive_loss": 5.225385245154886,
+            "policy_loss": -0.019616061438094166,
+            "entropy": 1.115421589683084
+          },
+          "seconds": 29.7
+        }
+      ]
+    }
+  ]
+}

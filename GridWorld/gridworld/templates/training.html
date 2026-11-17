@@ -4,11 +4,11 @@
 <body>
 <header><div><small>GRIDWORLD LAB / 03</small><h1>AI学習</h1></div><nav><a href="http://127.0.0.1:5001">マップ</a><a href="http://127.0.0.1:5002">環境のルール</a><a class="current" href="/">AI学習</a></nav></header>
 <main class="training-lab">
-<section class="lab-heading"><div><p class="eyebrow">LEARN · WATCH · SKIP</p><h2>学習を、その場で見よう。</h2><p>試行錯誤を観察して、好きな回数だけ高速学習。その続きの動きで、成長を確かめる。</p></div><span id="phase-badge" class="phase-badge">学習0回・開始前</span></section>
+<section class="lab-heading"><div><p class="eyebrow">LEARN · WATCH · SKIP</p><h2>学習を、その場で見よう。</h2><p>試行錯誤を観察して、好きな回数だけ高速学習。その続きの動きで、成長を確かめる。</p></div><button id="restart-program" class="secondary" type="button">再起動</button><button id="shutdown-program" class="secondary" type="button">プログラムを停止</button><span id="phase-badge" class="phase-badge">学習0回・開始前</span></section>
 <section class="card setup">
 <div class="setup-grid">
 <div class="field"><label for="map-list">マップ</label><select id="map-list"></select></div>
-<div class="field"><label for="mode">AI</label><select id="mode"><option value="q_learning">Q学習</option><option value="ppo">PPOエージェント</option><option value="grag">GRAG</option></select></div>
+<div class="field"><label for="mode">AI</label><select id="mode"><option value="q_learning">Q学習</option><option value="ppo">PPOエージェント</option><option value="grag">GRAG</option><option value="sgcrl">SGCRL</option><option value="cppo">CPPO</option></select></div>
 <div class="field"><label for="max-steps">1試行の最大行動回数</label><input id="max-steps" type="number" min="1" max="1000000" step="1" value="200"></div>
 <button id="new-training" class="secondary">新しい学習</button>
 </div>
@@ -17,6 +17,8 @@
 <div class="skip-controls"><div class="field"><label for="batch-episodes">高速学習する試行数</label><input id="batch-episodes" type="number" min="1" max="1000000" step="1" value="100"></div><button id="skip-training" class="skip-button">100試行を高速学習 →</button></div>
 </div>
 <p id="learning-hint" class="hint">観察中も実際に学習します。高速学習はアニメーションを省略し、同じAIを続けて学習させます。最大行動回数の変更は次の試行から適用します。</p>
+<div class="measurement-controls"><div class="field"><label for="measurement-limit">計測の最大実行時間（時間）</label><input id="measurement-limit" type="number" min="0.000001" max="100000" step="any" value="1"></div><button id="start-measurement">未学習から100%まで計測</button></div>
+<p class="hint">専用計測は重み・経験を初期化した新しいAIから高速学習し、直近100試行がすべて成功したら自動終了します。「0から」は学習0試行を意味し、初期方策の実測成功率が0%とは限りません。上限で未達成の場合も終了します。「計測を停止」で途中終了できます。以前の実験は保存ファイルに残ります。</p>
 <details id="advanced-settings"><summary>学習パラメータ</summary><div class="settings-grid">
 <div class="field"><label for="seed">乱数シード（空欄でランダム）</label><input id="seed" type="number" min="0" max="4294967295" step="1" value="42"></div>
 <div class="field"><label for="discount-factor">割引率 γ</label><input id="discount-factor" type="number" min="0" max="1" step="any" value="0.95"></div>
@@ -26,27 +28,40 @@
 <div class="field q-setting"><label for="min-epsilon">探索率の下限</label><input id="min-epsilon" type="number" min="0" max="1" step="any" value="0.05"></div>
 <div class="field ppo-setting" hidden><label for="ppo-learning-rate">PPOの学習率</label><input id="ppo-learning-rate" type="number" min="0.000001" step="any" value="0.0003"></div>
 <div class="field ppo-setting" hidden><label for="ppo-hidden-size">PPOの隠れ層幅</label><input id="ppo-hidden-size" type="number" min="1" step="1" value="64"></div>
-<div class="field crl-setting" hidden><label for="crl-gamma">GRAGの割引率 γ</label><input id="crl-gamma" type="number" min="0.000001" max="0.999999" step="any" value="0.99"></div>
-<div class="field crl-setting" hidden><label for="crl-learning-rate">GRAGの学習率</label><input id="crl-learning-rate" type="number" min="0.000001" step="any" value="0.0003"></div>
-<div class="field crl-setting" hidden><label for="crl-hidden-size">GRAGの隠れ層幅</label><input id="crl-hidden-size" type="number" min="1" step="1" value="256"></div>
-<div class="field crl-setting" hidden><label for="crl-min-replay">GRAGの初期収集遷移数</label><input id="crl-min-replay" type="number" min="2" step="1" value="10000"></div>
-<p class="hint crl-setting" hidden>GRAGは初期収集を終えてから学習します。ゴールは常に迷路のGです。表示する到達率は評価用で、報酬値は学習に使いません。</p>
+<div class="field crl-setting" hidden><label for="crl-gamma">対照学習の割引率 γ</label><input id="crl-gamma" type="number" min="0.000001" max="0.999999" step="any" value="0.99"></div>
+<div class="field crl-setting" hidden><label for="crl-learning-rate">対照学習の学習率</label><input id="crl-learning-rate" type="number" min="0.000001" step="any" value="0.0003"></div>
+<div class="field crl-setting" hidden><label for="crl-hidden-size">対照学習の隠れ層幅</label><input id="crl-hidden-size" type="number" min="1" step="1" value="256"></div>
+<div class="field crl-setting" hidden><label for="crl-min-replay">初期収集遷移数</label><input id="crl-min-replay" type="number" min="2" step="1" value="10000"></div>
+<div class="field grag-setting" hidden><label for="grag-positive-update-count">GRAGの1更新に必要な成功軌道数</label><input id="grag-positive-update-count" type="number" min="1" max="1000000" step="1" value="8"></div>
+<div class="field sgcrl-setting" hidden><label for="sgcrl-device">SGCRLの計算デバイス</label><select id="sgcrl-device"><option value="cuda">GPU（CUDA）</option><option value="auto">自動</option><option value="cpu">CPU</option></select></div>
+<div class="field sgcrl-setting" hidden><label for="crl-batch-size">SGCRLのバッチサイズ</label><input id="crl-batch-size" type="number" min="2" max="4096" step="1" value="256"></div>
+<div class="field sgcrl-setting" hidden><label for="crl-cache-mb">SGCRLのリプレイキャッシュ上限（MiB）</label><input id="crl-cache-mb" type="number" min="0" max="8192" step="1" value="8192"></div>
+<p class="hint crl-setting" hidden>SGCRLは初期収集を終えてから学習します。収集時のゴールは常に迷路のGです。SGCRLの報酬値は到達率の集計だけに使います。</p>
+<div class="field cppo-setting" hidden><label for="cppo-learning-rate">CPPOの学習率</label><input id="cppo-learning-rate" type="number" min="0.000001" step="any" value="0.00025"></div>
+<div class="field cppo-setting" hidden><label for="cppo-hidden-size">CPPOの隠れ層幅（4層）</label><input id="cppo-hidden-size" type="number" min="1" step="1" value="512"></div>
+<div class="field cppo-setting" hidden><label for="cppo-gamma">将来ゴール抽出の割引率 γ</label><input id="cppo-gamma" type="number" min="0.000001" max="0.999999" step="any" value="0.99"></div>
+<div class="field cppo-setting" hidden><label for="cppo-rollout-steps">1更新で集める合計行動数</label><input id="cppo-rollout-steps" type="number" min="2" step="1" value="65536"></div>
+<div class="field cppo-setting" hidden><label for="cppo-batch-size">CPPOのミニバッチサイズ</label><input id="cppo-batch-size" type="number" min="2" step="1" value="256"></div>
+<div class="field cppo-setting" hidden><label for="cppo-epochs">CPPOの更新エポック数</label><input id="cppo-epochs" type="number" min="1" step="1" value="1"></div>
+<div class="field cppo-setting" hidden><label for="cppo-entropy-coef">CPPOのentropy係数（探索）</label><input id="cppo-entropy-coef" type="number" min="0" step="any" value="0.01"></div>
+<div class="field cppo-setting" hidden><label for="cppo-normalize-advantage">CPPOのadvantage正規化</label><select id="cppo-normalize-advantage"><option value="true">有効</option><option value="false">無効（比較実験用）</option></select></div>
+<p class="hint cppo-setting" hidden>CPPOは報酬を学習に使いません。論文の128行動×512環境に合わせ、合計65,536行動を逐次収集してから更新します。少なくとも2試行の完了が必要です。収集中は方策を更新しません。小さい収集量では探索が早期に消える場合があります。曲線は到達率の評価用です。</p>
 </div><p class="hint">学習パラメータとシードの変更は「新しい学習」で適用します。</p></details>
 <p id="status" class="status" role="status" aria-live="polite">マップを選び、観察または高速学習を始めてください。</p>
 </section>
 <section id="fast-progress" class="fast-progress" hidden aria-live="polite"><div><strong id="fast-progress-label">高速学習中</strong><progress id="skip-progress" max="100" value="0"></progress><small>学習曲線とヒートマップは更新しています。</small></div><button id="stop-fast" class="stop-fast">高速学習を停止</button></section>
 <section id="stats" class="lab-stats" aria-label="学習の集計"></section>
+<p id="training-runtime" class="hint" aria-live="polite"></p>
+<p class="hint">100%到達時間は、直近100試行がすべて成功した最初の時点までの学習実行時間です。一時停止・表示待ち・評価・保存の時間は含みません。計測情報のない旧データは「記録なし」と表示します。</p>
 <section id="results" class="workbench">
 <section class="card live-card"><div class="card-heading"><div><p class="eyebrow">LIVE ENVIRONMENT</p><h2>試行錯誤を観察</h2></div><span id="live-indicator" class="live-indicator">待機</span></div><div class="world-stage"><canvas id="animation" width="700" height="700" role="img" aria-label="実際に学習しているAIの現在位置"></canvas><div id="skip-overlay" class="skip-overlay" hidden><span>⚡</span><strong>アニメーションを省略して学習中</strong><p>同じAIの学習が進んでいます。</p></div></div><p id="live-caption" class="live-caption">学習0回</p><div class="legend"><span><i class="legend-dot agent"></i>AI</span><span><i class="legend-dot start"></i>スタート</span><span><i class="legend-dot goal"></i>ゴール</span><span><i class="legend-dot wall"></i>障害物</span></div><p class="hint">録画や過去の試行の再生ではなく、学習器の現在位置を表示しています。</p></section>
-<section id="heatmap-section" class="card heatmap-card"><div class="card-heading"><div><p class="eyebrow">VISIT HEATMAP</p><h2>訪問回数ヒートマップ</h2></div><div class="heatmap-actions"><span id="visit-count" class="chart-note">0訪問</span><label class="heat-zoom-control" for="heat-zoom">表示倍率<input id="heat-zoom" type="range" min="50" max="250" step="25" value="100"><output id="heat-zoom-value" for="heat-zoom">100%</output></label></div></div><div class="world-stage heat-stage"><canvas id="heatmap" width="1400" height="1400" role="img" tabindex="0" aria-label="学習中の累計訪問回数。マスをクリックして行動確率を確認" aria-describedby="heatmap-help"></canvas></div><div class="heat-legend"><span>0回</span><div></div><span id="heat-max">0回</span></div><p id="heatmap-help" class="hint">マスをクリックすると、その位置での上下左右の行動確率を表示します。倍率を上げたときはスクロールして移動できます。</p><p id="heat-detail" class="hint">開始時の配置と衝突は加算しません。</p></section>
+<section id="heatmap-section" class="card heatmap-card"><div class="card-heading"><div><p class="eyebrow">VISIT HEATMAP</p><h2>訪問回数ヒートマップ</h2></div><div class="heatmap-actions"><span id="visit-count" class="chart-note">0訪問</span><button id="heat-fit" class="secondary" type="button">枠に合わせる</button><label class="heat-zoom-control" for="heat-zoom">表示倍率<input id="heat-zoom" type="range" min="50" max="250" step="25" value="100"><output id="heat-zoom-value" for="heat-zoom">100%</output></label></div></div><div class="world-stage heat-stage"><canvas id="heatmap" width="1400" height="1400" role="img" tabindex="0" aria-label="学習中の累計訪問回数。マスをクリックして行動確率を確認" aria-describedby="heatmap-help"></canvas></div><div class="heat-legend"><span>0回</span><div></div><span id="heat-max">0回</span></div><p id="heatmap-help" class="hint">マスをクリックすると、その位置での上下左右の行動確率を表示します。倍率を上げたときはスクロールして移動できます。</p><p id="heat-detail" class="hint">開始時の配置と衝突は加算しません。</p></section>
 <section id="curve-section" class="card"><div class="card-heading"><div><p class="eyebrow">LEARNING CURVE</p><h2>学習曲線</h2></div><span id="curve-count" class="chart-note">0試行</span></div><svg id="learning-curve" viewBox="0 0 760 280" class="curve" role="img" aria-label="直近100試行の平均報酬の学習曲線"></svg><p class="hint">横軸：完了した試行数 ／ 縦軸：直近100試行の平均報酬。高速学習中も更新します。</p></section>
 </section>
+<section id="value-section" class="card heatmap-card value-card" hidden><div class="card-heading"><div><p class="eyebrow">STATE VALUE HEATMAP</p><h2>GRAG ??????????</h2></div><div class="heatmap-actions"><button id="value-refresh" class="secondary" type="button">????????</button><button id="value-fit" class="secondary" type="button">??????</button><label class="heat-zoom-control" for="value-zoom">????<input id="value-zoom" type="range" min="50" max="250" step="25" value="100"><output id="value-zoom-value">100%</output></label></div></div><div class="world-stage heat-stage"><canvas id="value-map" width="1400" height="1400" role="img" tabindex="0" aria-label="?????????????????????????????"></canvas></div><div class="heat-legend"><span id="value-min">?</span><div></div><span id="value-max">?</span></div><p id="value-status" class="hint"></p></section>
 </main>
+<div id="value-popup" class="policy-popup" role="dialog" aria-labelledby="value-title" hidden><div class="policy-heading"><div><p class="eyebrow">ACTION ADVANTAGES</p><h3 id="value-title"></h3></div><button id="value-close" class="policy-close" type="button" aria-label="???">?</button></div><p id="value-snapshot" class="policy-snapshot"></p><div id="value-actions" class="policy-distribution"></div><p class="policy-note">???????? Q ? V ???</p></div>
 <div id="policy-popup" class="policy-popup" role="dialog" aria-labelledby="policy-title" tabindex="-1" hidden>
-<div class="policy-heading"><div><p class="eyebrow">ACTION PROBABILITIES</p><h3 id="policy-title">このマスの行動確率</h3></div><button id="policy-close" class="policy-close" type="button" aria-label="行動確率を閉じる">×</button></div>
-<p id="policy-snapshot" class="policy-snapshot"></p>
-<div id="policy-distribution" class="policy-distribution" aria-live="polite"></div>
-<p id="policy-note" class="policy-note"></p>
-<div class="policy-footer"><span id="policy-visits"></span><button id="policy-refresh" class="secondary" type="button">現在の確率に更新</button></div>
-</div>
+<div class="policy-heading"><div><p class="eyebrow">ACTION PROBABILITIES</p><h3 id="policy-title">?????????</h3></div><button id="policy-close" class="policy-close" type="button" aria-label="????????">?</button></div>
+<p id="policy-snapshot" class="policy-snapshot"></p><div id="policy-distribution" class="policy-distribution" aria-live="polite"></div><p id="policy-note" class="policy-note"></p><div class="policy-footer"><span id="policy-visits"></span><button id="policy-refresh" class="secondary" type="button">????????</button></div></div>
 <script src="/static/training.js"></script></body></html>

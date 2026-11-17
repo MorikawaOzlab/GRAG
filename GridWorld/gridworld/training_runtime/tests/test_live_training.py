@@ -236,6 +236,34 @@ class LiveApiTests(unittest.TestCase):
             time.sleep(.05)
             self.assertEqual(self.get("/api/train/status")["preview"]["total_steps"], before)
 
+    def test_training_clock_advances_during_a_blocked_weight_update(self):
+        entered, release = threading.Event(), threading.Event()
+
+        class UpdatingAgent(CountingAgent):
+            def end_episode(self):
+                entered.set()
+                release.wait(timeout=5)
+                super().end_episode()
+
+        with patch.dict(training_app.LEARNING_AGENTS, {"clock_test": UpdatingAgent}):
+            self.post('/api/train', {'map_name': MAP['name'], 'mode': 'clock_test',
+                                    'execution': 'fast', 'episodes': 100})
+            try:
+                self.assertTrue(entered.wait(timeout=3))
+                first = self.get('/api/train/status')['training_clock']
+                time.sleep(.03)
+                second = self.get('/api/train/status')['training_clock']
+                self.assertTrue(first['running'])
+                self.assertGreater(second['seconds'], first['seconds'])
+                self.change('pause')
+            finally:
+                release.set()
+            paused = self.state_when(lambda state: state['status'] == 'paused')
+            self.assertFalse(paused['training_clock']['running'])
+            before = paused['training_clock']['seconds']
+            time.sleep(.03)
+            self.assertEqual(self.get('/api/train/status')['training_clock']['seconds'], before)
+
     def test_skip_exact_count_then_continue_the_same_agent(self):
         with patch.dict(training_app.LEARNING_AGENTS, {"counting": CountingAgent}):
             job = self.post("/api/train", {"map_name": MAP["name"], "mode": "counting",

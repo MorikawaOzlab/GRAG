@@ -4,6 +4,7 @@ from collections import deque
 from copy import deepcopy
 import math
 from threading import RLock
+from time import perf_counter
 
 from agents.q_learning import ACTIONS, QLearningAgent
 from gridworld.world import GridWorld
@@ -44,6 +45,11 @@ class TrainingSession:
         self.total_reward = 0
         self.completed_episodes = 0
         self.total_steps = 0
+        self.training_seconds = 0.0
+        self._training_clock = (0.0, None)
+        self.success_100_milestone = None
+        self.timing_complete = True
+        self.benchmark = None
         self.frames = []  # 明示的な方策評価を呼んだ場合だけ使用する。
         self.last_batch_episodes = 0
         self._recent = deque(maxlen=100)
@@ -66,6 +72,27 @@ class TrainingSession:
 
     def step(self) -> dict:
         """実際の行動選択・環境遷移・学習を1回行う。途中で停止・再開できる。"""
+        with self._lock:
+            started = perf_counter()
+            self._training_clock = (self.training_seconds, started)
+            try:
+                live = self._step()
+            finally:
+                self.training_seconds += perf_counter() - started
+                self._training_clock = (self.training_seconds, None)
+            if (live["finished"] and self.timing_complete and self.success_100_milestone is None
+                    and len(self._recent) == 100 and sum(self._recent) == 100):
+                self.success_100_milestone = {"seconds": self.training_seconds,
+                                            "episode": self.completed_episodes, "steps": self.total_steps}
+            return live
+
+    def training_clock(self):
+        """更新中も読み取り可能。重い学習を保持するsession lockを取得しない。"""
+        accumulated, started = self._training_clock
+        return {"seconds": accumulated + (perf_counter() - started if started is not None else 0),
+                "running": started is not None}
+
+    def _step(self) -> dict:
         with self._lock:
             if self._observation is None:
                 self._observation = self.world.reset()
@@ -168,6 +195,40 @@ class TrainingSession:
                             if position == self.world.map["goal"] else
                             "衝突する方向も選択対象に含まれます。"}
 
+    def inspect_grag_values(self) -> dict:
+        """?????? CRL ? Q ??????????????"""
+        import torch
+        from agents.grag_impl.grag import GRAG, Transition, ACTIONS as GRAG_ACTIONS
+        with self._lock:
+            if not isinstance(self.agent, GRAG) or self.agent.actor is None:
+                return {"values": None}
+            observations = []
+            positions = []
+            for r in range(self.world.map["rows"]):
+                for c in range(self.world.map["cols"]):
+                    if [r, c] in self.world.map["obstacles"]:
+                        continue
+                    observation = self.world.observation()
+                    observation["position"] = [r, c]
+                    observations.append(observation)
+                    positions.append((r, c))
+            transitions = [Transition(state=self.agent.observation_to_tensor(o), action=0,
+                                      old_log_prob=0., reward=0., reached_goal=False,
+                                      goal_prompt=self.agent.generate_goal_prompt(o)) for o in observations]
+            with torch.no_grad():
+                q = self.agent._compute_crl_q(transitions)
+                states = torch.stack([t.state for t in transitions])
+                probabilities = torch.softmax(self.agent.actor(states), dim=-1)
+                values = (probabilities * q).sum(dim=-1)
+                advantages = q - values[:, None]
+            grid = [[None for _ in range(self.world.map["cols"])] for _ in range(self.world.map["rows"])]
+            for i, (r, c) in enumerate(positions):
+                value = float(values[i])
+                adv = [float(x) for x in advantages[i]]
+                if math.isfinite(value) and all(math.isfinite(x) for x in adv):
+                    grid[r][c] = {"value": value, "advantages": dict(zip(GRAG_ACTIONS, adv))}
+            return {"values": grid, "completed_episodes": self.completed_episodes, "total_steps": self.total_steps}
+
     def evaluate(self) -> list[dict]:
         with self._lock:
             self.frames = evaluate_policy(self.world.map, self.settings, self.agent)
@@ -185,6 +246,10 @@ class TrainingSession:
                 "schema_version": 3, "map": deepcopy(self.world.map),
                 "settings": {**self.settings, "episodes": self.completed_episodes},
                 "completed_episodes": self.completed_episodes, "total_steps": self.total_steps,
+                "training_seconds": self.training_seconds,
+                "success_100_milestone": deepcopy(self.success_100_milestone),
+                "timing_complete": self.timing_complete,
+                "benchmark": deepcopy(self.benchmark),
                 "visits": deepcopy(self.visits), "history": deepcopy(history),
                 "successes": self.successes, "total_reward": self.total_reward,
                 "recent_success_rate": sum(self._recent) / len(self._recent) if self._recent else 0,
@@ -192,7 +257,8 @@ class TrainingSession:
                                      if self._recent_steps else 0,
                 "frames": deepcopy(self.frames), "live": deepcopy(self.live),
                 "workers_used": 1, "batch_episodes": self.last_batch_episodes,
-                "q_table": None if compact else self.agent.export()}
+                "q_table": None if compact or (checkpoint and getattr(
+                    self.agent, "CHECKPOINT_INCLUDES_MODEL", False)) else self.agent.export()}
             if checkpoint:
                 save = getattr(self.agent, "checkpoint", None)
                 result["agent_checkpoint"] = save() if callable(save) else None
@@ -215,6 +281,12 @@ class TrainingSession:
         session.history = deepcopy(result["history"])
         session.completed_episodes = result.get("completed_episodes", result["settings"]["episodes"])
         session.total_steps = result.get("total_steps", sum(item["steps"] for item in session.history))
+        session.training_seconds = result.get("training_seconds", 0.0)
+        session._training_clock = (session.training_seconds, None)
+        session.success_100_milestone = deepcopy(result.get("success_100_milestone"))
+        # 旧データから過去の所要時間は復元できないため、最初の到達時間を捏造しない。
+        session.timing_complete = result.get("timing_complete", "training_seconds" in result)
+        session.benchmark = deepcopy(result.get("benchmark"))
         session.visits = deepcopy(result["visits"])
         session.successes = result["successes"]
         session.total_reward = result["total_reward"]

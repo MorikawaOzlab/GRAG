@@ -1,0 +1,192 @@
+[
+  {
+    "file": "diagnosis.json",
+    "variant": "baseline",
+    "seed": 42,
+    "episode": 100,
+    "successes": 0,
+    "visited": 13,
+    "wall_entropy": 0.26106470712657576,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis.json",
+    "variant": "raw_advantage",
+    "seed": 42,
+    "episode": 100,
+    "successes": 0,
+    "visited": 13,
+    "wall_entropy": 0.1573031399927533,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis.json",
+    "variant": "more_data",
+    "seed": 42,
+    "episode": 100,
+    "successes": 0,
+    "visited": 52,
+    "wall_entropy": 0.7795678419813238,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis.json",
+    "variant": "raw_more_data",
+    "seed": 42,
+    "episode": 100,
+    "successes": 0,
+    "visited": 52,
+    "wall_entropy": 1.0501413633678525,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis_more_data_entropy.json",
+    "variant": "more_data_entropy",
+    "seed": 7,
+    "episode": 600,
+    "successes": 4,
+    "visited": 53,
+    "wall_entropy": 0.8142813150604167,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis_more_data_entropy.json",
+    "variant": "more_data_entropy",
+    "seed": 42,
+    "episode": 600,
+    "successes": 2,
+    "visited": 54,
+    "wall_entropy": 0.8081413166721847,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis_more_data_entropy.json",
+    "variant": "more_data_entropy",
+    "seed": 123,
+    "episode": 600,
+    "successes": 33,
+    "visited": 56,
+    "wall_entropy": 0.4042231008228852,
+    "last_100_success_rate": 0.01
+  },
+  {
+    "file": "diagnosis_more_data_warmup_entropy.json",
+    "variant": "more_data_warmup_entropy",
+    "seed": 7,
+    "episode": 600,
+    "successes": 6,
+    "visited": 56,
+    "wall_entropy": 0.32452121923945243,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis_more_data_warmup_entropy.json",
+    "variant": "more_data_warmup_entropy",
+    "seed": 42,
+    "episode": 600,
+    "successes": 36,
+    "visited": 56,
+    "wall_entropy": 0.12136123779993785,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis_more_data_warmup_entropy.json",
+    "variant": "more_data_warmup_entropy",
+    "seed": 123,
+    "episode": 600,
+    "successes": 0,
+    "visited": 54,
+    "wall_entropy": 0.7847639332289648,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis_phased_phased_raw_entropy_more_data_entropy.json",
+    "variant": "phased",
+    "seed": 42,
+    "episode": 120,
+    "successes": 0,
+    "visited": 14,
+    "wall_entropy": 0.0024919616227389255,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis_phased_phased_raw_entropy_more_data_entropy.json",
+    "variant": "phased_raw",
+    "seed": 42,
+    "episode": 120,
+    "successes": 0,
+    "visited": 14,
+    "wall_entropy": 0.014500236193488447,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis_phased_phased_raw_entropy_more_data_entropy.json",
+    "variant": "entropy",
+    "seed": 42,
+    "episode": 120,
+    "successes": 0,
+    "visited": 13,
+    "wall_entropy": 0.35841537999468653,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis_phased_phased_raw_entropy_more_data_entropy.json",
+    "variant": "more_data_entropy",
+    "seed": 42,
+    "episode": 120,
+    "successes": 0,
+    "visited": 52,
+    "wall_entropy": 1.1256067395561824,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis_raw_more_data_entropy_paper_scale.json",
+    "variant": "raw_more_data_entropy",
+    "seed": 42,
+    "episode": 700,
+    "successes": 113,
+    "visited": 56,
+    "wall_entropy": 1.1980399985141443,
+    "last_100_success_rate": 0.1
+  },
+  {
+    "file": "diagnosis_raw_more_data_entropy_paper_scale.json",
+    "variant": "paper_scale",
+    "seed": 42,
+    "episode": 700,
+    "successes": 6,
+    "visited": 56,
+    "wall_entropy": 1.3843126549503566,
+    "last_100_success_rate": 0.01
+  },
+  {
+    "file": "diagnosis_scaled_goal_strong_entropy_raw_more_data_entropy.json",
+    "variant": "scaled_goal",
+    "seed": 42,
+    "episode": 200,
+    "successes": 0,
+    "visited": 19,
+    "wall_entropy": 0.002951229860499148,
+    "last_100_success_rate": 0.0
+  },
+  {
+    "file": "diagnosis_scaled_goal_strong_entropy_raw_more_data_entropy.json",
+    "variant": "strong_entropy",
+    "seed": 42,
+    "episode": 200,
+    "successes": 7,
+    "visited": 49,
+    "wall_entropy": 1.0631307545102584,
+    "last_100_success_rate": 0.07
+  },
+  {
+    "file": "diagnosis_scaled_goal_strong_entropy_raw_more_data_entropy.json",
+    "variant": "raw_more_data_entropy",
+    "seed": 42,
+    "episode": 200,
+    "successes": 19,
+    "visited": 56,
+    "wall_entropy": 1.1331003609764847,
+    "last_100_success_rate": 0.18
+  }
+]

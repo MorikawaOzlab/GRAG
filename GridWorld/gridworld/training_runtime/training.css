@@ -27,6 +27,8 @@
 .action-label small{font-size:10px;font-weight:500;color:#ab5545}
 .action-track{height:12px;border-radius:8px;background:#edf2f5;overflow:hidden}
 .action-fill{height:100%;background:#89b9b2;border-radius:8px}
+.lab-stat:nth-child(n+5) strong{font-size:clamp(16px,1.6vw,23px);overflow-wrap:anywhere}
+.measurement-controls{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-top:18px;padding-top:18px;border-top:1px solid #e5ecef}.measurement-controls .field{max-width:220px}.measurement-controls button{background:#1c3648}
 .action-probability.best .action-fill{background:#078878}
 .action-probability strong{font-size:18px;text-align:right;font-variant-numeric:tabular-nums}
 .action-probability.best strong{color:#078878}
@@ -34,3 +36,6 @@
 .policy-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid #e4ecef;padding-top:14px;font-size:12px;color:#647b88}
 .policy-footer button{font-size:12px;padding:8px 10px}
 @media(max-width:800px){.heatmap-card{grid-column:auto}.heatmap-card .card-heading{align-items:flex-start;flex-direction:column}.heatmap-actions{justify-content:flex-start;gap:12px}.heat-stage{max-height:76vh}.heat-zoom-control input{width:130px}}
+
+
+.value-card{margin-top:22px;width:calc((100% - 22px)/2);box-sizing:border-box}#value-dialog{border:1px solid #cbdce7;border-radius:12px;padding:24px;color:#233b48}#value-dialog::backdrop{background:#0006}#value-actions p{margin:8px 0}@media(max-width:800px){.value-card{width:100%}}

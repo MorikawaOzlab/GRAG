@@ -1,0 +1,35 @@
+{
+  "device": "cuda",
+  "torch": "2.14.1+cu130",
+  "gpu": "NVIDIA GeForce RTX 5070 Ti",
+  "batch_size": 256,
+  "state_dim": 800,
+  "goal_dim": 800,
+  "hidden_size": 256,
+  "repr_dim": 64,
+  "replay_size": 10000,
+  "updates_per_trial": 200,
+  "seconds": {
+    "legacy_sampling_adam": [
+      1.67328869999983,
+      1.6428596999976435,
+      1.643051099999866
+    ],
+    "cached_fused": [
+      1.098634600002697,
+      1.0128280999997514,
+      1.0896772999985842
+    ],
+    "cached_fused_shared": [
+      1.005553200000577,
+      1.0903028000029735,
+      1.0997595000008005
+    ]
+  },
+  "median_updates_per_second": {
+    "legacy_sampling_adam": 121.7247595038379,
+    "cached_fused": 183.54057664618676,
+    "cached_fused_shared": 183.43528054725215
+  },
+  "speedup": 1.5069676974097332
+}

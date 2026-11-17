@@ -153,7 +153,7 @@ class PPOAgent(PPOCheckpointMixin):
 
     @staticmethod
     def _features(observation: dict) -> tuple[tuple[int, int], tuple[float, ...]]:
-        """障害物・ゴール・現在位置の3チャネルと、正規化座標を入力する。"""
+        """障害物・ゴール・現在位置の3チャネルを入力する。"""
         rows, cols = observation.get("rows"), observation.get("cols")
         if (type(rows) is not int or type(cols) is not int
                 or not 2 <= rows <= 50 or not 2 <= cols <= 50):
@@ -177,9 +177,7 @@ class PPOAgent(PPOCheckpointMixin):
         cells = [(r, c) for r in range(rows) for c in range(cols)]
         features = ([float(cell in walls) for cell in cells]
                     + [float(cell == goal) for cell in cells]
-                    + [float(cell == position) for cell in cells]
-                    + [position[0] / (rows - 1), position[1] / (cols - 1),
-                       goal[0] / (rows - 1), goal[1] / (cols - 1)])
+                    + [float(cell == position) for cell in cells])
         return (rows, cols), tuple(features)
 
     def _initialize_model(self, shape: tuple[int, int]) -> None:
@@ -197,7 +195,7 @@ class PPOAgent(PPOCheckpointMixin):
         # CPUだけを使い、他の利用者のグローバル乱数系列を変更しない。
         with torch.random.fork_rng(devices=[]):
             torch.random.default_generator.manual_seed(self._seed)
-            model = _actor_critic(torch, 3 * shape[0] * shape[1] + 4,
+            model = _actor_critic(torch, 3 * shape[0] * shape[1],
                                   self._config["ppo_hidden_size"]).to(device="cpu", dtype=torch.float32)
         self._torch = torch
         self._model = model
@@ -367,7 +365,7 @@ class PPOAgent(PPOCheckpointMixin):
             for name, tensor in self._model.state_dict().items()}
         return {
             "schema_version": 1, "algorithm": "PPO", "model_type": "mlp_actor_critic",
-            "observation_encoding": "grid_channels_v1", "actions": list(ACTIONS),
+            "observation_encoding": "grid_channels_v2", "actions": list(ACTIONS),
             "map_shape": None if self._map_shape is None else list(self._map_shape),
             "settings": {**self._config, "seed": self._seed, "goal_text": self._goal_text},
             "state_dict": weights,
@@ -379,9 +377,11 @@ class PPOAgent(PPOCheckpointMixin):
     @classmethod
     def from_export(cls, data: dict) -> "PPOAgent":
         """export()のモデルを復元する。再学習は新しいoptimizer・乱数系列で始める。"""
+        if data.get("observation_encoding") == "grid_channels_v1":
+            raise ValueError("旧形式のPPOモデルは正規化座標を含むため読み込めません。新しく学習してください。")
         if (data.get("schema_version") != 1 or data.get("algorithm") != "PPO"
                 or data.get("model_type") != "mlp_actor_critic"
-                or data.get("observation_encoding") != "grid_channels_v1"
+                or data.get("observation_encoding") != "grid_channels_v2"
                 or data.get("actions") != list(ACTIONS)):
             raise ValueError("対応していないPPOモデル形式です。")
         agent = cls(data["settings"])

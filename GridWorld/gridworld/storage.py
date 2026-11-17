@@ -121,5 +121,5 @@ def load_settings() -> dict[str, Any]:
     source = training_path if training_path.exists() else SETTINGS
     raw = read_json(source) if source.exists() else {}
     clean = validate_settings({**DEFAULT_SETTINGS, **raw})
-    clean.update({key: value for key, value in raw.items() if key.startswith(("ppo_", "crl_"))})
+    clean.update({key: value for key, value in raw.items() if key.startswith(("ppo_", "crl_", "cppo_", "grag_"))})
     return clean

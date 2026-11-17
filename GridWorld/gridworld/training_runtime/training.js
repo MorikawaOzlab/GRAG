@@ -2,16 +2,33 @@ const $ = id => document.getElementById(id);
 let result = null, job = null, selectedMap = null, busy = false, initialized = false;
 let heatmapMap = null, selectedHeatCell = null, policyRequest = 0, policyAnchor = null;
 let lastCompletedJob = null, lastDrawn = null, animationHandle = null;
+let lastPreviewKey = null;
+let initialJobAdopted = false, programStopped = false;
+let liveTrainingClock = null, liveClockReceivedAt = 0;
+const formatDuration = seconds => seconds < 60 ? seconds.toFixed(2) + ' 秒'
+  : Math.floor(seconds / 60).toLocaleString() + ' 分 ' + (seconds % 60).toFixed(1) + ' 秒';
 const ppoMode = () => $('mode').value === 'ppo';
-const gragMode = () => $('mode').value === 'grag';
+const gragMode = () => ['grag', 'sgcrl'].includes($('mode').value);
+const cppoMode = () => $('mode').value === 'cppo';
+const cppoFields = { learning_rate: 'cppo-learning-rate', hidden_size: 'cppo-hidden-size',
+  gamma: 'cppo-gamma', rollout_steps: 'cppo-rollout-steps', batch_size: 'cppo-batch-size', epochs: 'cppo-epochs',
+  entropy_coef: 'cppo-entropy-coef', normalize_advantage: 'cppo-normalize-advantage' };
 const matches = data => data && data.map.name === $('map-list').value && data.mode === $('mode').value;
 const interactive = () => job && job.execution !== 'batch' && ['running', 'paused'].includes(job.status) && matches(result) && job.session_id === result.session_id;
 const integer = (value, min, max) => Number.isSafeInteger(value) && value >= min && value <= max;
 
 async function api(url, body) {
-  const response = await fetch(url, body === undefined ? undefined : {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  let response;
+  try {
+    response = await fetch(url, body === undefined ? {signal: controller.signal} : {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') throw Error('処理の応答待ちが長くなっています。進捗を確認してから再操作してください。');
+    throw error;
+  } finally { clearTimeout(timeout); }
   const data = await response.json();
   if (!response.ok) throw Error(data.error || '処理に失敗しました。');
   return data;
@@ -20,19 +37,28 @@ function message(text, error = false) {
   $('status').textContent = text; $('status').classList.toggle('error', error);
 }
 function syncControls() {
-  const active = job?.status === 'running';
+  const active = job?.status === 'running' || job?.saving;
+  const stopping = active && job?.control_pending;
   const current = interactive(), watching = current && job.execution === 'observe' && active;
-  const skipping = current && job.execution === 'fast' && active;
+  const measuring = current && job.benchmark && active;
+  const skipping = current && (job.execution === 'fast' || measuring) && active;
   document.querySelectorAll('.q-setting').forEach(el => el.hidden = $('mode').value !== 'q_learning');
   document.querySelectorAll('.ppo-setting').forEach(el => el.hidden = !ppoMode());
   document.querySelectorAll('.crl-setting').forEach(el => el.hidden = !gragMode());
-  $('discount-factor').parentElement.hidden = gragMode();
+  document.querySelectorAll('.grag-setting').forEach(el => el.hidden = $('mode').value !== 'grag');
+  document.querySelectorAll('.sgcrl-setting').forEach(el => el.hidden = $('mode').value !== 'sgcrl');
+  document.querySelectorAll('.cppo-setting').forEach(el => el.hidden = !cppoMode());
+  $('discount-factor').parentElement.hidden = gragMode() || cppoMode();
   $('map-list').disabled = busy || active; $('mode').disabled = busy || active;
   $('new-training').disabled = !initialized || !selectedMap || busy || active;
-  $('observe-training').disabled = !initialized || !selectedMap || busy || watching || (active && !current);
-  $('pause-training').disabled = busy || !current || job.status === 'paused';
-  $('skip-training').disabled = !initialized || !selectedMap || busy || skipping || (active && !current);
-  $('stop-fast').disabled = busy;
+  $('observe-training').disabled = !initialized || !selectedMap || busy || watching || measuring || stopping || job?.saving || (active && !current);
+  $('pause-training').disabled = busy || stopping || job?.saving || !current || job.status === 'paused';
+  $('skip-training').disabled = !initialized || !selectedMap || busy || stopping || job?.saving || skipping || (active && !current);
+  $('start-measurement').disabled = !initialized || !selectedMap || busy || active;
+  $('measurement-limit').disabled = busy || active;
+  $('max-steps').disabled = measuring || stopping || job?.saving;
+  $('pause-training').textContent = measuring ? '計測を停止' : 'Ⅱ 一時停止';
+  $('stop-fast').disabled = busy || stopping || job?.saving;
   const count = Number($('batch-episodes').value);
   $('skip-training').textContent = integer(count, 1, 1000000) ? count.toLocaleString() + '試行を高速学習 →' : '指定回数を高速学習 →';
   $('fast-progress').hidden = !skipping;
@@ -40,10 +66,17 @@ function syncControls() {
   $('animation').parentElement.classList.toggle('skipping', skipping);
   $('live-indicator').classList.toggle('watching', watching);
   $('live-indicator').textContent = skipping ? '高速学習' : watching ? 'LIVE · 学習中' : current ? '一時停止' : '待機';
-  $('phase-badge').textContent = skipping ? '高速学習中' : watching ? '観察しながら学習中' : current ? '一時停止' : '学習0回・開始前';
+  $('phase-badge').textContent = measuring ? '100%到達まで計測中' : skipping ? '高速学習中' : watching ? '観察しながら学習中' : current ? '一時停止' : result?.benchmark ? ({reached: '100%到達・計測完了', limit: '時間上限・未達成', cancelled: '計測を停止'}[result.benchmark.status] || '計測終了') : '学習0回・開始前';
+  if (job?.saving) $('phase-badge').textContent = '学習停止済み・保存中';
+  else if (stopping) $('phase-badge').textContent = '停止受付済み・更新完了待ち';
+  else if (active && job.snapshot_age_seconds > 1) $('phase-badge').textContent = '学習更新中・直前の進捗を表示';
+  else if (active && job.runtime?.phase === 'updating') $('phase-badge').textContent =
+    '重み更新 ' + job.runtime.completed + ' / ' + job.runtime.total;
   if (skipping) {
-    $('skip-progress').max = job.total; $('skip-progress').value = Math.min(job.completed, job.total);
-    $('fast-progress-label').textContent = '高速学習 ' + job.completed.toLocaleString() + ' / ' + job.total.toLocaleString() + '試行';
+    $('skip-progress').max = measuring ? job.max_hours * 3600 : job.total;
+    $('skip-progress').value = measuring ? Math.min(job.elapsed_seconds || 0, job.max_hours * 3600) : Math.min(job.completed, job.total);
+    $('fast-progress-label').textContent = measuring ? '計測 ' + ((job.elapsed_seconds || 0) / 3600).toFixed(3) + ' / ' + job.max_hours + '時間 · ' + job.completed.toLocaleString() + '試行' : '高速学習 ' + job.completed.toLocaleString() + ' / ' + job.total.toLocaleString() + '試行';
+    if (job?.saving || stopping) $('fast-progress-label').textContent = job.saving ? '学習は停止済みです。保存しています…' : '停止要求を受け付けました。実行中の更新を待っています…';
   }
 }
 function trainingSettings() {
@@ -68,21 +101,51 @@ function trainingSettings() {
     value.crl_hidden_size = Number($('crl-hidden-size').value);
     value.crl_min_replay_size = Number($('crl-min-replay').value);
   }
+  if ($('mode').value === 'grag') {
+    value.grag_positive_update_count = Number($('grag-positive-update-count').value);
+    if (!integer(value.grag_positive_update_count, 1, 1000000)) throw Error('成功軌道数は1〜1,000,000の整数にしてください。');
+  }
+  if ($('mode').value === 'sgcrl') {
+    value.crl_device = $('sgcrl-device').value;
+    value.crl_batch_size = Number($('crl-batch-size').value);
+    value.crl_replay_cache_mb = Number($('crl-cache-mb').value);
+    if (!integer(value.crl_batch_size, 2, 4096)) throw Error('バッチサイズは2〜4096にしてください。');
+    if (!integer(value.crl_replay_cache_mb, 0, 8192)) throw Error('キャッシュ上限は0〜8192MiBにしてください。');
+  }
+  if (cppoMode()) for (const [key, id] of Object.entries(cppoFields)) value['cppo_' + key] =
+    key === 'normalize_advantage' ? $(id).value === 'true' : Number($(id).value);
   return value;
 }
 function stats(data) {
   const n = data?.completed_episodes ?? data?.settings?.episodes ?? 0;
+  const milestone = data?.success_100_milestone;
+  const duration = formatDuration;
   const values = [[n.toLocaleString(), '完了した試行数'],
     [((data?.recent_success_rate ?? 0) * 100).toFixed(0) + '%', '直近100試行の到達率'],
     [(data?.recent_mean_steps ?? 0).toFixed(1), '直近100試行の平均行動数'],
-    [(data?.total_steps ?? 0).toLocaleString(), '累計の行動数']];
-  $('stats').replaceChildren(...values.map(([value, label]) => {
+    [(data?.total_steps ?? 0).toLocaleString(), '累計の行動数'],
+    [duration(data?.training_seconds ?? 0), data?.timing_complete === false ? '学習実行時間（再開後）' : '学習実行時間'],
+    [milestone ? duration(milestone.seconds) : data?.timing_complete === false ? '記録なし（旧データ）' : '未達成',
+      '直近100試行が100%になるまで'],
+    [milestone ? milestone.episode.toLocaleString() + ' 試行 / ' + milestone.steps.toLocaleString() + ' 行動' : '—',
+      '初めて100%になった時点']];
+  $('stats').replaceChildren(...values.map(([value, label], index) => {
     const box = document.createElement('div'), caption = document.createElement('small'), number = document.createElement('strong');
     box.className = 'lab-stat'; caption.textContent = label; number.textContent = value;
+    if (index === 4) number.id = 'training-clock';
     box.append(caption, number); return box;
   }));
   $('curve-count').textContent = n.toLocaleString() + '試行';
+  refreshTrainingClock();
 }
+function refreshTrainingClock() {
+  const clock = liveTrainingClock;
+  if (!clock || !result || clock.session_id !== result.session_id) return;
+  const number = $('training-clock');
+  if (number) number.textContent = formatDuration(clock.seconds +
+    (clock.running ? Math.max(0, performance.now() - liveClockReceivedAt) / 1000 : 0));
+}
+setInterval(refreshTrainingClock, 100);
 function drawCurve(history, total) {
   const top = 18, bottom = 230, left = 65, right = 740, n = Math.max(1, total);
   const x = v => left + v / n * (right - left), y = v => bottom - v * (bottom - top);
@@ -145,8 +208,16 @@ function drawHeat(map, visits) {
   heatmapMap = map;
   const canvas = $('heatmap'), context = canvas.getContext('2d');
   const zoom = Number($('heat-zoom').value || 100) / 100;
-  const available = Math.max(320, canvas.parentElement.clientWidth - 32);
-  const unit = Math.max(44, available / Math.max(map.rows, map.cols)) * zoom;
+  const stage = canvas.parentElement, style = getComputedStyle(stage);
+  const paddingX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+  const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+  const availableWidth = Math.max(1, stage.clientWidth - paddingX);
+  const heightLimit = parseFloat(style.maxHeight);
+  const availableHeight = Number.isFinite(heightLimit)
+    ? Math.max(1, heightLimit - paddingY - (stage.offsetHeight - stage.clientHeight))
+    : availableWidth;
+  // 100%は縦横比を保って枠内に全マスが収まる倍率。
+  const unit = Math.min(availableWidth / map.cols, availableHeight / map.rows) * zoom;
   const width = map.cols * unit, height = map.rows * unit;
   // 拡大時にもキャンバスのメモリ使用量を抑え、同じサイズでは再確保しない。
   const density = Math.min(window.devicePixelRatio || 1, 2, 4096 / Math.max(width, height));
@@ -164,9 +235,9 @@ function drawHeat(map, visits) {
     context.fillRect(c * unit + 1, r * unit + 1, unit - 2, unit - 2);
     if (!wall) {
       context.fillStyle = ratio > .7 ? '#fff' : '#344e5b';
-      context.font = '600 ' + Math.min(38 * zoom, Math.max(16 * zoom, unit * .32)) + 'px sans-serif';
+      context.font = '600 ' + Math.max(1, Math.min(38 * zoom, unit * .32)) + 'px sans-serif';
       context.textAlign = 'center'; context.textBaseline = 'middle';
-      context.fillText(visits[r][c].toLocaleString(), (c + .5) * unit, (r + .5) * unit, unit - 8);
+      context.fillText(visits[r][c].toLocaleString(), (c + .5) * unit, (r + .5) * unit, Math.max(1, unit - 8));
     }
   }
   if (selectedHeatCell && selectedHeatCell.mapName === map.name) {
@@ -266,10 +337,12 @@ function render(data) {
   result = data; syncControls();
   if (!matches(data)) return;
   selectedMap = data.map;
+  scheduleValueMap(data);
   stats(data); drawCurve(data.history, data.completed_episodes ?? data.settings.episodes);
   drawHeat(data.map, data.visits); drawLive(data);
 }
 async function chooseMap() {
+  valueToken++; valueGrid = null; valueKey = null; $('value-section').hidden = true;
   closePolicyPopup(false);
   if (!$('map-list').value) return;
   selectedMap = await api('/api/maps/' + encodeURIComponent($('map-list').value));
@@ -306,32 +379,115 @@ async function action(kind) {
   busy = true; syncControls();
   try {
     if (kind === 'new') { await ensureInteractive(true); message('学習0回のAIを準備しました。観察または高速学習を始められます。'); }
+    else if (kind === 'measure') {
+      const limit = Number($('measurement-limit').value), settings = trainingSettings();
+      if (!Number.isFinite(limit) || limit <= 0 || limit > 100000) throw Error('計測の最大時間は0より大きく100,000以下にしてください。');
+      if (!$('map-list').value) throw Error('計測するマップを選択してください。');
+      closePolicyPopup(false);
+      job = await api('/api/train', {map_name: $('map-list').value, mode: $('mode').value,
+        execution: 'benchmark', max_hours: limit, training_settings: settings});
+      result = {session_id: job.session_id, mode: $('mode').value, map: selectedMap,
+        settings: {...settings, episodes: 0}, completed_episodes: 0, history: [],
+        visits: Array.from({length: selectedMap.rows}, () => Array(selectedMap.cols).fill(0)),
+        live: {episode: 1, step: 0, position: selectedMap.start}, can_continue: true,
+        benchmark: {status: 'running'}};
+      render(result);
+      message('新しいAIで計測を開始しました。直近100試行が100%になったら自動終了します。');
+    }
     else if (kind === 'observe') { await ensureInteractive(); await control('observe'); message('エージェントの試行錯誤を観察しています。'); }
     else if (kind === 'skip') {
       const count = Number($('batch-episodes').value);
       if (!integer(count, 1, 1000000)) throw Error('高速学習する試行回数は1〜1,000,000の整数にしてください。');
       await ensureInteractive(); await control('skip', { episodes: count });
       message(count.toLocaleString() + '試行を高速学習します。途中でも停止できます。');
-    } else { await control('pause'); message(kind === 'stop-fast' ? '高速学習を停止しています…' : '一時停止しています…'); }
+    } else { const measuring = job?.benchmark; await control('pause'); message(measuring ? '計測を停止しています…' : kind === 'stop-fast' ? '高速学習を停止しています…' : '一時停止しています…'); }
   } catch (error) { message(error.message, true); }
   finally { busy = false; syncControls(); }
 }
 async function poll() {
+  if (programStopped) return;
   try {
     const state = await api('/api/train/status');
     if (state.job_id) job = state;
-    if (state.preview) render(state.preview);
+    if (state.training_clock) {
+      liveTrainingClock = {...state.training_clock, session_id: state.session_id};
+      liveClockReceivedAt = performance.now();
+      refreshTrainingClock();
+    }
+    else if (['idle', 'error', 'complete', 'initializing'].includes(state.status)) liveTrainingClock = null;
+    const runtime = state.runtime;
+    $('training-runtime').textContent = runtime ? '実行デバイス: ' + runtime.device +
+      ' / 重み更新: ' + runtime.updates.toLocaleString() + '回' +
+      (runtime.phase === 'updating' ? '（今回 ' + runtime.completed + '/' + runtime.total + '）' : '') +
+      ' / バッチ: ' + runtime.batch_size + ' / 更新速度: ' + runtime.updates_per_second.toFixed(1) + '回/秒' +
+      (runtime.cuda_graph ? ' / CUDA Graph有効' : runtime.cuda_graph_error ? ' / CUDA Graph利用不可' : '') +
+      ' / リプレイ: ' + runtime.replay_size.toLocaleString() + '件' +
+      (runtime.replay_cached ? '（' + (runtime.device.startsWith('cuda') ? 'GPU' : 'CPU') + 'キャッシュ）' : '（CPU抽出）') : '';
+    if (state.preview) {
+      if ((!initialJobAdopted || state.status === 'running') && !busy && !matches(state.preview)) {
+        // Reloading the page must not leave another AI selected with its controls locked.
+        $('map-list').value = state.preview.map.name;
+        $('mode').value = state.mode;
+        $('max-steps').value = state.preview.settings.max_steps;
+      }
+      initialJobAdopted = true;
+      const key = state.job_id + ':' + state.preview_revision;
+      if (state.preview_revision === undefined || key !== lastPreviewKey) {
+        render(state.preview); lastPreviewKey = key;
+      }
+    }
     else if (state.status === 'complete' && state.job_id !== lastCompletedJob) {
       lastCompletedJob = state.job_id;
       const data = await api('/api/result'); render(data);
+      if (data.benchmark) message(data.benchmark.status === 'reached'
+        ? '計測完了：100%到達まで ' + data.success_100_milestone.seconds.toFixed(2) + ' 秒（' + data.success_100_milestone.episode.toLocaleString() + '試行）。'
+        : data.benchmark.status === 'limit' ? '時間上限に達したため計測を終了しました。成功率100%には未達成です。' : '計測を停止しました。');
     }
     if (state.status === 'error') message(state.error || '学習中にエラーが発生しました。', true);
+    else if (state.control_error) message(state.control_error, true);
     syncControls();
-  } catch (error) { if (initialized) message('接続を確認しています… ' + error.message, true); }
-  finally { setTimeout(poll, job?.status === 'paused' ? 250 : 150); }
+  } catch (error) { if (initialized && !programStopped) message('接続を確認しています… ' + error.message, true); }
+  finally { if (!programStopped) setTimeout(poll, job?.status === 'paused' ? 250 : 150); }
 }
 syncControls();
+$('restart-program').onclick = async () => {
+  if (!confirm('再起動すると実行中の学習は終了します。再起動しますか？')) return;
+  const button = $('restart-program');
+  button.disabled = true;
+  try {
+    const previous = await api('/api/runtime');
+    await api('/api/restart', {});
+    programStopped = true;
+    document.querySelectorAll('button, input, select').forEach(element => element.disabled = true);
+    $('phase-badge').textContent = '再起動中';
+    message('再起動しています…');
+    const deadline = Date.now() + 60000;
+    while (Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      try {
+        const response = await fetch('/api/runtime', {cache: 'no-store', signal: AbortSignal.timeout(2000)});
+        if (response.ok && (await response.json()).runtime_id !== previous.runtime_id) {
+          location.reload();
+          return;
+        }
+      } catch (_) { /* The server may be restarting. */ }
+    }
+    message('再起動を確認できませんでした。ページを再読み込みしてください。', true);
+  } catch (error) { button.disabled = false; message(error.message, true); }
+};
+$('shutdown-program').onclick = async () => {
+  const button = $('shutdown-program');
+  button.disabled = true;
+  try {
+    await api('/api/shutdown', {});
+    programStopped = true;
+    document.querySelectorAll('button, input, select').forEach(element => element.disabled = true);
+    $('phase-badge').textContent = 'プログラム停止済み';
+    message('プログラムを停止しました。');
+  } catch (error) { button.disabled = false; message(error.message, true); }
+};
 $('new-training').onclick = () => action('new');
+$('start-measurement').onclick = () => action('measure');
 $('observe-training').onclick = () => action('observe');
 $('pause-training').onclick = () => action('pause');
 $('skip-training').onclick = () => action('skip');
@@ -363,6 +519,12 @@ $('heatmap').onkeydown = event => {
   openPolicyCell(position[0], position[1], { x: Math.max(12, Math.min(window.innerWidth - 12, rect.left + rect.width / 2)), y: Math.max(12, Math.min(window.innerHeight - 12, rect.top + rect.height / 2)) });
 };
 $('heat-zoom').oninput = redrawHeat;
+$('heat-fit').onclick = () => {
+  $('heat-zoom').value = '100';
+  redrawHeat();
+  $('heatmap').parentElement.scrollTo(0, 0);
+  positionPolicyPopup();
+};
 $('policy-close').onclick = () => closePolicyPopup(true, true);
 $('policy-refresh').onclick = () => {
   if (selectedHeatCell) openPolicyCell(selectedHeatCell.row, selectedHeatCell.col, policyAnchor);
@@ -382,18 +544,116 @@ if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => redrawHeat()
     for (const agent of agents) if (![...$('mode').options].some(option => option.value === agent.key)) $('mode').add(new Option(agent.name, agent.key));
     const ids = { max_steps: 'max-steps', seed: 'seed', discount_factor: 'discount-factor', learning_rate: 'learning-rate',
       epsilon: 'epsilon', epsilon_decay: 'epsilon-decay', min_epsilon: 'min-epsilon', ppo_learning_rate: 'ppo-learning-rate', ppo_hidden_size: 'ppo-hidden-size',
-      crl_gamma: 'crl-gamma', crl_learning_rate: 'crl-learning-rate', crl_hidden_size: 'crl-hidden-size', crl_min_replay_size: 'crl-min-replay' };
+      crl_gamma: 'crl-gamma', crl_learning_rate: 'crl-learning-rate', crl_hidden_size: 'crl-hidden-size', crl_min_replay_size: 'crl-min-replay',
+      grag_positive_update_count: 'grag-positive-update-count',
+      crl_device: 'sgcrl-device', crl_batch_size: 'crl-batch-size', crl_replay_cache_mb: 'crl-cache-mb' };
+    for (const [key, id] of Object.entries(cppoFields)) ids['cppo_' + key] = id;
     for (const [key, id] of Object.entries(ids)) if (config[key] !== undefined) $(id).value = config[key] ?? '';
+    await chooseMap();
+    initialized = true; syncControls(); poll();
+    if (!maps.length) message('マップ作成アプリでマップを保存してください。');
     try {
       const saved = await api('/api/result');
-      if (maps.some(map => map.name === saved.map.name) && [...$('mode').options].some(option => option.value === saved.mode)) {
+      if (!job?.job_id && !result?.session_id && !busy && maps.some(map => map.name === saved.map.name) && [...$('mode').options].some(option => option.value === saved.mode)) {
         $('map-list').value = saved.map.name; $('mode').value = saved.mode;
         for (const [key, id] of Object.entries(ids)) if (saved.settings[key] !== undefined) $(id).value = saved.settings[key] ?? '';
         render(saved);
         message('前回の学習状態を読み込みました。観察または高速学習を続けられます。');
       }
     } catch (_) { /* 保存結果がなければ学習0回から始める。 */ }
-    await chooseMap(); if (!maps.length) message('マップ作成アプリでマップを保存してください。');
-    initialized = true; syncControls(); poll();
+    await chooseMap();
   } catch (error) { message(error.message, true); }
 })();
+
+let valueGrid = null, valueMap = null, valueTimer = null, valueToken = 0, valueKey = null;
+function scheduleValueMap(data) {
+  const visible = data?.mode === 'grag' && matches(data);
+  $('value-section').hidden = !visible;
+  if (!visible) { valueToken++; valueGrid = null; valueKey = null; return; }
+  const key = data.session_id + ':' + data.total_steps;
+  if (key === valueKey) return;
+  valueKey = key;
+  if (!valueTimer) valueTimer = setTimeout(() => { valueTimer = null; refreshValueMap(result); }, 1000);
+}
+async function refreshValueMap(data = result) {
+  if (!data || data.mode !== 'grag' || !matches(data)) return;
+  const token = ++valueToken;
+  $('value-status').textContent = '?????????????';
+  try {
+    const snapshot = await api('/api/train/grag-values', {session_id: data.session_id, mode: data.mode, map_name: data.map.name});
+    if (token !== valueToken || !matches(result) || result.session_id !== data.session_id) return;
+    valueGrid = snapshot.values; valueMap = data.map;
+    $('value-status').textContent = valueGrid ? `?? ${snapshot.completed_episodes}? / ${snapshot.total_steps}??????????????????????????????????` : '??????????????';
+    drawValueMap();
+  } catch (error) { if (token === valueToken) $('value-status').textContent = '???????????????: ' + error.message; }
+}
+let selectedValueCell = null;
+function drawValueMap() {
+  const canvas = $('value-map'), context = canvas.getContext('2d');
+  if (!valueGrid || !valueMap) { context.clearRect(0, 0, canvas.width, canvas.height); return; }
+  const zoom = Number($('value-zoom').value || 100) / 100;
+  const stage = canvas.parentElement, style = getComputedStyle(stage);
+  const availableWidth = Math.max(1, stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight));
+  const heightLimit = parseFloat(style.maxHeight);
+  const availableHeight = Number.isFinite(heightLimit) ? Math.max(1, heightLimit - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) - (stage.offsetHeight - stage.clientHeight)) : availableWidth;
+  const unit = Math.min(availableWidth / valueMap.cols, availableHeight / valueMap.rows) * zoom;
+  const width = valueMap.cols * unit, height = valueMap.rows * unit;
+  const density = Math.min(window.devicePixelRatio || 1, 2, 4096 / Math.max(width, height));
+  const pw = Math.round(width * density), ph = Math.round(height * density);
+  if (canvas.width !== pw) canvas.width = pw;
+  if (canvas.height !== ph) canvas.height = ph;
+  canvas.style.width = width + 'px'; canvas.style.height = height + 'px';
+  context.setTransform(density, 0, 0, density, 0, 0);
+  const values = valueGrid.flat().filter(Boolean).map(cell => cell.value);
+  const min = Math.min(...values), max = Math.max(...values);
+  $('value-min').textContent = Number.isFinite(min) ? min.toPrecision(3) : '?';
+  $('value-max').textContent = Number.isFinite(max) ? max.toPrecision(3) : '?';
+  $('value-zoom-value').value = Math.round(zoom * 100) + '%';
+  context.fillStyle = '#dce6eb'; context.fillRect(0, 0, width, height);
+  for (let r = 0; r < valueMap.rows; r++) for (let c = 0; c < valueMap.cols; c++) {
+    const cell = valueGrid[r][c], ratio = cell ? (cell.value - min) / (max - min || 1) : 0;
+    context.fillStyle = cell ? 'rgb(' + Math.round(255 - 35 * ratio) + ',' + Math.round(255 - 158 * ratio) + ',' + Math.round(255 - 180 * ratio) + ')' : '#354f60';
+    context.fillRect(c * unit + 1, r * unit + 1, unit - 2, unit - 2);
+    if (cell) {
+      context.fillStyle = ratio > .7 ? '#fff' : '#344e5b';
+      context.font = '600 ' + Math.max(1, Math.min(38 * zoom, unit * .32)) + 'px sans-serif';
+      context.textAlign = 'center'; context.textBaseline = 'middle';
+      context.fillText(cell.value.toPrecision(3), (c + .5) * unit, (r + .5) * unit, Math.max(1, unit - 8));
+    }
+  }
+  if (selectedValueCell) { context.strokeStyle = '#078878'; context.lineWidth = Math.max(3, unit * .045); context.strokeRect(selectedValueCell.col * unit + 3, selectedValueCell.row * unit + 3, unit - 6, unit - 6); }
+}
+function closeValuePopup() { $('value-popup').hidden = true; selectedValueCell = null; drawValueMap(); }
+function openValueCell(row, col, x, y) {
+  const cell = valueGrid?.[row]?.[col]; if (!cell) return;
+  selectedValueCell = {row, col}; drawValueMap();
+  $('value-title').textContent = `?? [${row}, ${col}] ????????`;
+  $('value-snapshot').textContent = $('value-status').textContent;
+  const directions = [['up','? ?'],['down','? ?'],['left','? ?'],['right','? ?']];
+  const maxAbs = Math.max(...directions.map(([key]) => Math.abs(cell.advantages[key])), 1e-12);
+  const best = Math.max(...directions.map(([key]) => cell.advantages[key]));
+  $('value-actions').replaceChildren(...directions.map(([key,label]) => {
+    const row = document.createElement('div'), name = document.createElement('span'), track = document.createElement('div'), fill = document.createElement('div'), number = document.createElement('strong');
+    row.className = 'action-probability' + (cell.advantages[key] === best ? ' best' : '');
+    name.className = 'action-label'; name.textContent = label; track.className = 'action-track'; fill.className = 'action-fill'; fill.style.width = (Math.abs(cell.advantages[key]) / maxAbs * 100) + '%';
+    number.textContent = cell.advantages[key].toPrecision(3); track.append(fill); row.append(name, track, number); return row;
+  }));
+  const popup = $('value-popup'); popup.hidden = false;
+  const rect = popup.getBoundingClientRect(), margin = 12;
+  popup.style.left = Math.max(margin, Math.min(x + 14, window.innerWidth - rect.width - margin)) + 'px';
+  popup.style.top = Math.max(margin, Math.min(y + 14, window.innerHeight - rect.height - margin)) + 'px';
+}
+$('value-refresh').onclick = () => refreshValueMap();
+$('value-zoom').oninput = drawValueMap;
+$('value-fit').onclick = () => { $('value-zoom').value = '100'; drawValueMap(); $('value-map').parentElement.scrollTo(0, 0); };
+$('value-close').onclick = closeValuePopup;
+$('value-map').onclick = event => {
+  if (!valueGrid || !valueMap) return;
+  const rect = event.currentTarget.getBoundingClientRect();
+  openValueCell(Math.floor((event.clientY - rect.top) / rect.height * valueMap.rows), Math.floor((event.clientX - rect.left) / rect.width * valueMap.cols), event.clientX, event.clientY);
+};
+$('value-map').onkeydown = event => { if ((event.key === 'Enter' || event.key === ' ') && valueMap) { event.preventDefault(); const rect = event.currentTarget.getBoundingClientRect(); const pos = result?.live?.position || valueMap.start; openValueCell(pos[0], pos[1], rect.left + rect.width / 2, rect.top + rect.height / 2); } };
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('value-popup').hidden) { closeValuePopup(); $('value-map').focus({preventScroll:true}); } });
+document.addEventListener('pointerdown', event => { if (!$('value-popup').hidden && !$('value-popup').contains(event.target) && event.target !== $('value-map')) closeValuePopup(); });
+window.addEventListener('resize', drawValueMap);
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(drawValueMap).observe($('value-map').parentElement);

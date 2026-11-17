@@ -4,12 +4,15 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import os
 import re
+import math
 from threading import Event, Lock
 from time import monotonic
 from uuid import uuid4
 from urllib.parse import unquote
 
 from agents.q_learning import QLearningAgent
+from agents.cppo import CPPOAgent
+from agents.grag_impl.grag_sgcrl import GridWorldSGCRL
 from gridworld.storage import (RESULT, WORLD, list_maps, load_settings,
                      map_path, read_json, validate_map, validate_settings, write_json)
 from gridworld.training_runtime import TrainingSession
@@ -18,8 +21,8 @@ from gridworld.web_common import Handler, serve
 
 
 LEARNING_AGENTS = {"q_learning": QLearningAgent, "ppo": PPOAgentSession,
-                   "grag": GRAGSession}
-PPO_MODES = {"ppo", "grag"}
+                   "grag": GRAGSession, "sgcrl": GridWorldSGCRL, "cppo": CPPOAgent}
+PPO_MODES = {"ppo", "grag", "sgcrl", "cppo"}
 DEFAULT_SKIP_EPISODES = 100
 learning_sessions = {}
 executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="grid-training")
@@ -122,17 +125,26 @@ def run_job(job: dict, selected: dict, settings: dict, mode: str) -> None:
             preview = session_result(session, job["session_id"], mode, compact=True)
             with job_lock:
                 job["preview"] = preview
+                job["preview_revision"] = job.get("preview_revision", 0) + 1
                 job["completed"] = max(0, session.completed_episodes - job["episodes_before"])
+                if job.get("benchmark"):
+                    job["elapsed_seconds"] = session.training_seconds
             last_publish = now
 
     def save():
+        publish(force=True)
+        with job_lock:
+            job["saving"] = True
+            job["phase"] = "学習を停止して保存中です"
         result = session_result(session, job["session_id"], mode, checkpoint=True)
         write_json(saved_session_path(job["session_id"]), result)
         # 古い観察ジョブを閉じて新規学習を始めた場合、最新結果を取り違えない。
         with job_lock:
             is_current = current_job is job
         if is_current:
-            write_json(RESULT, result)
+            write_json(RESULT, display_result(result) if mode in PPO_MODES else result)
+        with job_lock:
+            job["saving"] = False
         return result
 
     try:
@@ -140,6 +152,35 @@ def run_job(job: dict, selected: dict, settings: dict, mode: str) -> None:
             threads = configure_ppo_cpu_threads()
             with job_lock:
                 job["cpu_threads"] = threads
+
+        if job.get("benchmark"):
+            # 常に新規学習から開始し、100/100成功・上限・停止要求のいずれかで終了する。
+            publish(force=True)
+            while True:
+                with job_lock:
+                    stopped = job["_control"] == "paused"
+                if stopped:
+                    outcome = "cancelled"
+                    break
+                session.step()
+                if session.success_100_milestone is not None:
+                    outcome = "reached"
+                    break
+                if session.training_seconds >= job["max_hours"] * 3600:
+                    outcome = "limit"
+                    break
+                publish()
+            session.benchmark.update(status=outcome, training_seconds=session.training_seconds,
+                                     completed_episodes=session.completed_episodes,
+                                     total_steps=session.total_steps)
+            session.evaluate()
+            save()
+            with job_lock:
+                job.update(status="complete", completed=session.completed_episodes,
+                           benchmark_outcome=outcome, phase={"reached": "100%到達・計測完了",
+                           "limit": "時間上限・未達成", "cancelled": "計測を停止"}[outcome])
+                job.pop("preview", None)
+            return
 
         if not job["_interactive"]:
             def progress(completed):
@@ -173,7 +214,7 @@ def run_job(job: dict, selected: dict, settings: dict, mode: str) -> None:
                     publish(force=True)
                     paused_saved = True
                 with job_lock:
-                    job.update(status="paused", execution="paused", phase="一時停止")
+                    job.update(status="paused", execution="paused", phase="一時停止", control_pending=False)
                 job["_wake"].wait(0.1)
                 job["_wake"].clear()
                 continue
@@ -196,8 +237,10 @@ def run_job(job: dict, selected: dict, settings: dict, mode: str) -> None:
                 job["_wake"].wait(delay / 1000)
                 job["_wake"].clear()
     except Exception as error:
+        if job.get("benchmark"):
+            session.benchmark["status"] = "error"
         with job_lock:
-            job.update(status="error", error=str(error))
+            job.update(status="error", error=str(error), saving=False)
         # エラー時も公開できる最後の状態は表示する。学習状態は上書きしない。
         publish(force=True)
 
@@ -227,13 +270,20 @@ class TrainingHandler(Handler):
         if path == "/api/train/status":
             with job_lock:
                 status = public_job(current_job) if current_job is not None else {"status": "idle"}
+                entry = learning_sessions.get(status.get("session_id"))
+            if entry is not None:
+                session = entry["session"]
+                status["training_clock"] = session.training_clock()
+                runtime = getattr(session.agent, "runtime_status", None)
+                if callable(runtime):
+                    status["runtime"] = runtime()
             return self.json(status)
         return super().get_api(path)
 
     def post_api(self, path, body):
         global current_job
         request = self.parse_json(body)
-        if path == "/api/train/policy":
+        if path in ("/api/train/policy", "/api/train/grag-values"):
             sid = request.get("session_id")
             mode = canonical_agent_mode(request.get("mode"))
             if not isinstance(mode, str) or mode not in LEARNING_AGENTS:
@@ -259,7 +309,8 @@ class TrainingHandler(Handler):
                 raise ValueError("行動確率を確認するマップが学習時と一致しません。")
             if mode in PPO_MODES:
                 configure_ppo_cpu_threads()
-            data = session.inspect_policy(request.get("position"))
+            data = (session.inspect_grag_values() if path == "/api/train/grag-values"
+                    else session.inspect_policy(request.get("position")))
             return self.json({**data, "session_id": sid, "mode": mode,
                               "map_name": session.world.map["name"]})
         if path == "/api/train/control":
@@ -276,12 +327,18 @@ class TrainingHandler(Handler):
                 if request.get("session_id") != job["session_id"]:
                     raise ValueError("操作する学習が画面と一致しません。画面を更新してください。")
                 session = learning_sessions[job["session_id"]]["session"]
+                if job.get("benchmark") and action != "pause":
+                    raise ValueError("計測中は設定や実行方法を変更できません。停止してから新しく開始してください。")
                 if action == "pause":
                     job["_control"] = "paused"
+                    job["control_pending"] = True
+                    job["phase"] = "停止要求を受け付けました。更新の完了を待っています"
                 elif action == "observe":
                     job["_control"] = "observe"
+                    job["control_pending"] = False
                     job["total"] = 0
                 elif action == "skip":
+                    job["control_pending"] = False
                     job["_after_fast"] = ("observe" if job["_control"] == "observe" else "paused")
                     job["episodes_before"] = session.completed_episodes
                     job["total"] = episodes
@@ -303,8 +360,15 @@ class TrainingHandler(Handler):
             mode = canonical_agent_mode(request.get("mode", "q_learning"))
             evaluation_only = path == "/api/train/evaluate"
             execution = request.get("execution", "batch")
-            if execution not in ("batch", "observe", "fast", "paused"):
+            if execution not in ("batch", "observe", "fast", "paused", "benchmark"):
                 raise ValueError("実行方法が正しくありません。")
+            benchmark = execution == "benchmark"
+            max_hours = request.get("max_hours", 1)
+            if benchmark and (isinstance(max_hours, bool) or not isinstance(max_hours, (int, float))
+                              or not math.isfinite(max_hours) or not 0 < max_hours <= 100000):
+                raise ValueError("計測の最大時間は0より大きく100,000以下の時間で指定してください。")
+            if benchmark and (evaluation_only or request.get("session_id") is not None):
+                raise ValueError("100%までの計測は既存の学習を引き継がず、新規学習から開始します。")
             if not isinstance(mode, str) or mode not in LEARNING_AGENTS:
                 raise ValueError("AIの種類を選択してください。")
             if not isinstance(name, str) or not map_path(name).is_file():
@@ -336,6 +400,9 @@ class TrainingHandler(Handler):
                     else:
                         sid = uuid4().hex
                         session = TrainingSession(selected, settings, LEARNING_AGENTS[mode])
+                        if benchmark:
+                            session.benchmark = {"status": "running", "window": 100,
+                                                 "max_hours": max_hours, "start_episode": 0}
                         learning_sessions[sid] = {"mode": mode, "session": session}
                         write_json(RESULT.parent / "training_settings.json", settings)
                     before = session.completed_episodes
@@ -349,6 +416,9 @@ class TrainingHandler(Handler):
                        "total": episodes,
                        "workers": 1, "episodes_before": before, "evaluation_only": evaluation_only,
                        "execution": execution, "step_delay_ms": delay,
+                       "benchmark": benchmark,
+                       "max_hours": max_hours if benchmark else None,
+                       "elapsed_seconds": 0,
                        "_interactive": execution != "batch" and mode in LEARNING_AGENTS,
                        "_wake": Event(), "_control": execution if execution != "batch" else "fast",
                        "_target": before + episodes, "_after_fast": "paused"}
@@ -367,4 +437,5 @@ class TrainingHandler(Handler):
 
 
 if __name__ == "__main__":
-    serve(TrainingHandler, 5003)
+    from gridworld.training_ui import main
+    main()
