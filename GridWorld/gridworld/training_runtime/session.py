@@ -39,6 +39,9 @@ class TrainingSession:
         self.world = GridWorld(deepcopy(map_data))
         self.settings = deepcopy(settings)
         self.agent = agent_type(deepcopy(self.settings))
+        initialize = getattr(self.agent, "initialize_for_gridworld", None)
+        if callable(initialize):
+            initialize(self.world.map)
         self.history = []
         self.visits = [[0] * self.world.map["cols"] for _ in range(self.world.map["rows"])]
         self.successes = 0
