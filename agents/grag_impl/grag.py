@@ -14,17 +14,6 @@ from torch import nn
 ACTIONS = ("up", "down", "left", "right")
 
 
-def gridworld_observation(observation: dict) -> torch.Tensor:
-    """GridWorldの観測をActor用の特徴に変換する。"""
-    rows, cols = observation["rows"], observation["cols"]
-    state = torch.zeros((3, rows, cols), dtype=torch.float32)
-    for row, col in observation["obstacles"]:
-        state[0, row, col] = 1
-    state[1, *observation["goal"]] = 1
-    state[2, *observation["position"]] = 1
-    return state
-
-
 class GRAG:
     """行動選択や学習のロジックをこれから実装するためのインターフェース。"""
 
@@ -52,17 +41,26 @@ class GRAG:
             raise ValueError("seedは0〜2^32-1の整数またはNoneにしてください。")
 
 
-    def initialize_networks(self, state_dim: int, goal_dim: int, action_dim: int | None = None) -> None:
+    def initialize_networks(self, state_dim: int | None = None, goal_dim: int | None = None,
+                            action_dim: int | None = None, *, problem=None) -> None:
         """Actorと対照学習用ネットワークを初期化する。
 
         Args:
             state_dim: 状態ベクトルの次元数
             goal_dim: ゴールベクトルの次元数
             action_dim: 離散行動の数。省略時はsettingsのactionsの数。
+            problem: network_dimensions(action_dim) と encode_observation(observation)
+                を提供する問題アダプター。指定時は各次元を直接渡さない。
 
         状態・行動エンコーダー: φ(s,a)
         ゴールエンコーダー: ψ(g)
         """
+        if problem is not None:
+            if state_dim is not None or goal_dim is not None or action_dim is not None:
+                raise ValueError("problem???????????????")
+            state_dim, goal_dim, action_dim = problem.network_dimensions(len(self.actions))
+            if not callable(getattr(problem, "encode_observation", None)):
+                raise ValueError("problem??encode_observation??????")
         if action_dim is None:
             action_dim = len(self.actions)
         if any(type(n) is not int or n <= 0 for n in (state_dim, goal_dim, action_dim)):
@@ -73,6 +71,8 @@ class GRAG:
         if self._network_spec is not None:
             if self._network_spec != spec:
                 raise ValueError("初期化済みネットワークの次元は変更できません。")
+            if problem is not None:
+                self.observation_encoder = problem.encode_observation
             return
         repr_dim = 64
 
@@ -104,17 +104,19 @@ class GRAG:
             self.sa_encoder = build_encoder(state_dim + action_dim)
             self.goal_encoder = build_encoder(goal_dim)
         self._network_spec = spec
+        if problem is not None:
+            self.observation_encoder = problem.encode_observation
 
     def initialize_for_gridworld(self, map_data: dict) -> None:
         """GridWorldのマップから特徴次元を決める。"""
-        self.initialize_networks(3 * map_data["rows"] * map_data["cols"], 2, len(self.actions))
+        from agents.grag_impl.gridworld_adapter import GridWorldAdapter
+
+        self.initialize_networks(problem=GridWorldAdapter(map_data))
 
     def _action_logits(self, observation) -> torch.Tensor:
         """観測を変換し、現在のActorの行動スコアを返す。"""
         if self.observation_encoder is not None:
             features = self.observation_encoder(observation)
-        elif isinstance(observation, dict):
-            features = gridworld_observation(observation)
         else:
             features = observation
         state = torch.as_tensor(features, dtype=torch.float32).detach().cpu()

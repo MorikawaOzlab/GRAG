@@ -3,6 +3,7 @@ import unittest
 import torch
 
 from agents.grag_impl.grag import GRAG
+from agents.grag_impl.gridworld_adapter import GridWorldAdapter
 
 
 class GenericActionTests(unittest.TestCase):
@@ -35,6 +36,36 @@ class GenericActionTests(unittest.TestCase):
         agent.initialize_for_gridworld(observation)
         self.assertIn(agent.choose_action(observation, greedy=True),
                       ("up", "down", "left", "right"))
+
+    def test_problem_adapter_initializes_and_encodes(self):
+        observation = {"rows": 2, "cols": 3, "obstacles": [[0, 1]],
+                       "goal": [1, 2], "position": [0, 0]}
+        adapter = GridWorldAdapter(observation)
+        state = adapter.encode_observation(observation)
+        self.assertEqual(tuple(state.shape), (3, 2, 3))
+        self.assertEqual(state.sum().item(), 3)
+        self.assertEqual(state[0, 0, 1].item(), 1)
+        self.assertEqual(state[1, 1, 2].item(), 1)
+        self.assertEqual(state[2, 0, 0].item(), 1)
+        agent = GRAG({"seed": 1})
+        agent.initialize_networks(problem=adapter)
+        self.assertEqual(agent._network_spec, (18, 2, 4))
+        self.assertIn(agent.choose_action(observation), agent.actions)
+        with self.assertRaises(ValueError):
+            adapter.encode_observation({**observation, "rows": 3})
+
+    def test_other_problem_adapter(self):
+        class Problem:
+            def network_dimensions(self, action_dim):
+                return 2, 1, action_dim
+
+            def encode_observation(self, observation):
+                return [observation["x"], observation["y"]]
+
+        agent = GRAG({"actions": (0, 1), "seed": 1})
+        agent.initialize_networks(problem=Problem())
+        self.assertEqual(agent._network_spec, (2, 1, 2))
+        self.assertIn(agent.choose_action({"x": 1, "y": 2}), (0, 1))
 
     def test_initialization_preserves_weights_and_rng(self):
         agent = GRAG({"seed": 4, "actions": (0, 1)})

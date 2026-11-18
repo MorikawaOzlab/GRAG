@@ -25,7 +25,6 @@ LLM_Agentic_RL/
 │  ├─ grag.py              # GRAGの公開入口
 │  ├─ grag_impl/           # 作成中のGRAG・旧実装・テスト
 │  │  ├─ grag.py           # GRAGクラスの実装
-│  │  └─ grag_interface.py # インターフェースひな形
 │  ├─ ppo_agent.py
 │  ├─ ppo_agent_impl/
 │  ├─ q_learning.py

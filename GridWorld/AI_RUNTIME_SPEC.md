@@ -43,7 +43,6 @@
 | [ppo_agent_impl/agent.py](agents/ppo_agent_impl/agent.py) | GRAGからコピーしたPPO本体。GRAGを継承しない | `ppo_checkpoint`、`agents.ppo_agent_impl.goals`、`torch` |
 | [ppo_agent_impl/goals.py](agents/ppo_agent_impl/goals.py) | コピーした目標取得・判定ヘルパー | プロジェクト内依存なし |
 | [grag.py](agents/grag.py) | 独自AIの `GRAG` の公開入口 | `agents.grag_impl.grag` |
-| [grag_interface.py](agents/grag_impl/grag_interface.py) | 環境に依存しないAIインターフェースのひな形 | プロジェクト内依存なし |
 | [grag_impl/grag.py](agents/grag_impl/grag.py) | `GRAG` の実装。目標取得・達成判定、ニューラルPPOの行動選択・確率取得・学習・保存 | `ppo_checkpoint`、`agents.grag_impl.goals`、`agents.grag_impl.networks`、`torch`（行動選択・学習時に読み込み） |
 | [grag_impl/networks.py](agents/grag_impl/networks.py) | CleanRL型Actor-Critic。入力次元・行動数・隠れ層幅を受け取る | `torch` |
 | [grag_impl/goals.py](agents/grag_impl/goals.py) | 自然言語の目標文と判定用座標、達成判定 | プロジェクト内依存なし |

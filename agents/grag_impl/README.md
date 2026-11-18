@@ -101,3 +101,23 @@ python -m scripts.verify_sgcrl --episodes 100 --seeds 7 --device cuda
 以前のPPO混合実装は `grag_ppo_reference.py`、その説明は `PPO_REFERENCE.md` に保存しています。
 旧仕様を検査する `test_goals.py`、`test_ppo.py`、`test_cleanrl_grid.py` は現在のSGCRLを対象としません。
 独立したPPOエージェントの実装は `agents/ppo_agent_impl/` です。
+# 問題アダプター
+
+基本の `GRAG` は、ネットワークの初期化時に問題アダプターを受け取れます。
+GridWorld では次のようにマップからアダプターを作成します。
+
+```python
+from agents.grag import GRAG
+from agents.grag_impl.gridworld_adapter import GridWorldAdapter
+
+agent = GRAG({"seed": 1})
+agent.initialize_networks(problem=GridWorldAdapter(map_data))
+action = agent.choose_action(observation)
+```
+
+アダプターは `network_dimensions(action_dim)` で状態・ゴール・行動の
+次元を返し、`encode_observation(observation)` で観測を数値テンソルに変換します。
+GridWorld の状態は障害物・ゴール・現在位置の3チャネルです。
+従来の `initialize_for_gridworld(map_data)` と、次元を直接指定する
+`initialize_networks(state_dim, goal_dim, action_dim)` も利用できます。
+
