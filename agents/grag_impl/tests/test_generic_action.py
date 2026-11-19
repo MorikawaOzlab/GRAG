@@ -24,8 +24,14 @@ class GenericActionTests(unittest.TestCase):
             a.choose_action([1, 2])
         a.initialize_networks(2, 1, 2)
         b.initialize_networks(2, 1, 2)
-        self.assertEqual([a.choose_action([1, 2]) for _ in range(20)],
-                         [b.choose_action([1, 2]) for _ in range(20)])
+        def sample(agent):
+            actions = []
+            for _ in range(20):
+                action = agent.choose_action([1, 2])
+                actions.append(action)
+                agent.learn([1, 2], action, 0, [1, 2], False)
+            return actions
+        self.assertEqual(sample(a), sample(b))
         with self.assertRaises(ValueError):
             a.choose_action([1, 2, 3])
 

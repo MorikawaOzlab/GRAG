@@ -121,3 +121,15 @@ GridWorld の状態は障害物・ゴール・現在位置の3チャネルです
 従来の `initialize_for_gridworld(map_data)` と、次元を直接指定する
 `initialize_networks(state_dim, goal_dim, action_dim)` も利用できます。
 
+GRAG本体の `_prepare_state` は、アダプターによる変換後に、問題に共通する
+テンソル化・次元と有限値の確認・コピーを行います。
+
+## 経験の保存
+
+通常の `choose_action` は観測、状態、行動インデックスと選択時の対数確率を
+`pending` に保持します。続く `learn` が報酬、次の観測と状態、ゴール到達の
+有無を加え、1遷移として `trajectory` に保存します。`end_episode` は
+ゴール到達や時間切れで軌跡を `episodes` に移します。評価時の
+`choose_action(..., greedy=True)` は経験を保存しません。
+現在は経験の収集のみで、重みの更新とメモリの自動消去は行いません。
+

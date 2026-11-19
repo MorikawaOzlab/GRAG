@@ -1,12 +1,14 @@
-"""離散行動を扱うGRAGエージェントの実装ひな形。
+"""離散行動を扱うGRAGエージェント。
 
-実装後は既存の学習処理に次のように渡せます。
+既存の学習処理に次のように渡せます。
 
     from agents.grag import GRAG
     from gridworld.training import train
 
     result = train(map_data, settings, agent_type=GRAG)
 """
+
+from copy import deepcopy
 
 import torch
 from torch import nn
@@ -15,10 +17,10 @@ ACTIONS = ("up", "down", "left", "right")
 
 
 class GRAG:
-    """行動選択や学習のロジックをこれから実装するためのインターフェース。"""
+    """Actorによる行動選択と、エピソード単位の経験収集を行う。"""
 
     def __init__(self, settings: dict):
-        """学習パラメータを受け取る。モデルや内部状態の初期化はここに追加する。"""
+        """設定と経験収集用のメモリを初期化する。"""
         self.settings = settings
         self.actions = tuple(settings.get("actions", ACTIONS))
         if not self.actions:
@@ -31,6 +33,9 @@ class GRAG:
         self.goal_encoder = None
         self.actor = None
         self._network_spec = None
+        self.episodes = []    # 終了したエピソードの軌跡
+        self.trajectory = []  # 現在のエピソードの遷移
+        self.pending = None   # 行動選択後、learn()を待っている情報
         self._generator = torch.Generator(device="cpu")
         seed = settings.get("seed")
         if seed is None:
@@ -39,7 +44,6 @@ class GRAG:
             self._generator.manual_seed(seed)
         else:
             raise ValueError("seedは0〜2^32-1の整数またはNoneにしてください。")
-
 
     def initialize_networks(self, state_dim: int | None = None, goal_dim: int | None = None,
                             action_dim: int | None = None, *, problem=None) -> None:
@@ -57,10 +61,10 @@ class GRAG:
         """
         if problem is not None:
             if state_dim is not None or goal_dim is not None or action_dim is not None:
-                raise ValueError("problem???????????????")
+                raise ValueError("problemと次元を同時に指定できません。")
             state_dim, goal_dim, action_dim = problem.network_dimensions(len(self.actions))
             if not callable(getattr(problem, "encode_observation", None)):
-                raise ValueError("problem??encode_observation??????")
+                raise ValueError("problemにはencode_observationが必要です。")
         if action_dim is None:
             action_dim = len(self.actions)
         if any(type(n) is not int or n <= 0 for n in (state_dim, goal_dim, action_dim)):
@@ -91,8 +95,7 @@ class GRAG:
 
             return nn.Sequential(*layers)
 
-        # ネットワークを初期化
-        # start_dim : 状態sの次元
+        # ネットワークの初期化によって外部の乱数状態を変えない。
         with torch.random.fork_rng(devices=[]):
             torch.manual_seed(self._generator.initial_seed())
 
@@ -100,7 +103,7 @@ class GRAG:
                 nn.Flatten(), nn.Linear(state_dim, 64), nn.Tanh(),
                 nn.Linear(64, 64), nn.Tanh(), nn.Linear(64, action_dim),
             )
-            
+
             self.sa_encoder = build_encoder(state_dim + action_dim)
             self.goal_encoder = build_encoder(goal_dim)
         self._network_spec = spec
@@ -113,13 +116,13 @@ class GRAG:
 
         self.initialize_networks(problem=GridWorldAdapter(map_data))
 
-    def _action_logits(self, observation) -> torch.Tensor:
-        """観測を変換し、現在のActorの行動スコアを返す。"""
+    def _prepare_state(self, observation) -> torch.Tensor:
+        """アダプターで観測を変換し、共通の検証とコピーを行う。"""
         if self.observation_encoder is not None:
             features = self.observation_encoder(observation)
         else:
             features = observation
-        state = torch.as_tensor(features, dtype=torch.float32).detach().cpu()
+        state = torch.as_tensor(features, dtype=torch.float32).detach().cpu().clone()
         if state.numel() == 0 or not torch.isfinite(state).all():
             raise ValueError("観測の特徴は空でない有限の数値にしてください。")
         if self.actor is None:
@@ -127,6 +130,10 @@ class GRAG:
         if state.numel() != self._network_spec[0]:
             raise ValueError("観測の特徴の要素数がstate_dimと一致しません。")
 
+        return state
+
+    def _action_logits(self, state: torch.Tensor) -> torch.Tensor:
+        """変換済みの状態に対するActorの行動スコアを返す。"""
         with torch.no_grad():
             reference = next(self.actor.parameters())
             logits = self.actor(state.reshape(1, -1).to(reference)).squeeze(0)
@@ -136,13 +143,28 @@ class GRAG:
 
     def choose_action(self, observation, greedy: bool = False):
         """観測から行動を選ぶ。greedy=Trueでは最大確率の行動を返す。"""
-        logits = self._action_logits(observation)
+        
+        if not greedy and self.pending is not None:
+            raise RuntimeError("次の行動選択前にlearn()を呼んでください。")
+        
+        state = self._prepare_state(observation)
+        logits = self._action_logits(state)
+
         with torch.no_grad():
             if greedy:
                 action = logits.argmax().item()
             else:
                 probabilities = torch.softmax(logits, dim=-1).cpu()
                 action = torch.multinomial(probabilities, 1, generator=self._generator).item()
+
+                # learnメソッドで学習用にメモリに記録するための一時保存
+                self.pending = {
+                    "observation": deepcopy(observation),
+                    "state": state,
+                    "action": action,  # actions内のインデックス
+                    "log_prob": float(torch.log_softmax(logits, dim=-1)[action].item()),
+                }
+
         return self.actions[action]
 
     def action_probabilities(self, observation) -> dict:
@@ -152,24 +174,36 @@ class GRAG:
                 raise ValueError("行動確率の取得には重複しないactionsが必要です。")
         except TypeError as exc:
             raise ValueError("行動確率の取得には辞書のキーとして使えるactionsが必要です。") from exc
-        probabilities = torch.softmax(self._action_logits(observation), dim=-1).cpu().tolist()
+        
+        state = self._prepare_state(observation)
+        probabilities = torch.softmax(self._action_logits(state), dim=-1).cpu().tolist()
+
         return dict(zip(self.actions, probabilities))
 
-    def learn(self, observation: dict, action: str, reward: float,
-              next_observation: dict, reached_goal: bool) -> None:
-        """1回の行動の結果を受け取り、必要に応じて学習する。
+    def learn(self, observation, action, reward: float,
+              next_observation, reached_goal: bool) -> None:
 
-        reward はゴール到達時に1、それ以外は0。
-        reached_goal はゴール到達を表し、最大行動回数による終了は含まない。
-        学習しないAIなら、このメソッドは空のままでよい。
-        """
-        # TODO: 必要なら学習や経験の記録を実装する。
-        pass
+        if self.pending is None or self.actions[self.pending["action"]] != action:
+            raise RuntimeError("learn()には直前に選択した行動を渡してください。")
+        
+        next_state = self._prepare_state(next_observation)
+        self.trajectory.append({
+            **self.pending,
+            "reward": reward,
+            "next_observation": deepcopy(next_observation),
+            "next_state": next_state,
+            "reached_goal": reached_goal,
+        })
+
+        self.pending = None
 
     def end_episode(self) -> None:
         """ゴール到達または最大行動回数で試行が終わるたびに呼ばれる。"""
-        # TODO: 必要なら試行ごとの後処理や内部状態のリセットを実装する。
-        pass
+        if self.pending is not None:
+            raise RuntimeError("learn()の後にend_episode()を呼んでください。")
+        if self.trajectory:
+            self.episodes.append(self.trajectory)
+            self.trajectory = []
 
     def export(self) -> dict:
         """保存用のJSONに変換可能な辞書を返す。

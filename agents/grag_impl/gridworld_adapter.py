@@ -13,9 +13,11 @@ class GridWorldAdapter:
             raise ValueError("rowsとcolsは正の整数にしてください。")
 
     def network_dimensions(self, action_dim: int) -> tuple[int, int, int]:
+        """状態・ゴール・行動の次元をこの順に返す。"""
         return 3 * self.rows * self.cols, 2, action_dim
 
     def encode_observation(self, observation: dict) -> torch.Tensor:
+        """観測を障害物・ゴール・現在位置の3チャネルに変換する。"""
         if (observation["rows"], observation["cols"]) != (self.rows, self.cols):
             raise ValueError("観測のマップサイズがアダプターと一致しません。")
         state = torch.zeros((3, self.rows, self.cols), dtype=torch.float32)
