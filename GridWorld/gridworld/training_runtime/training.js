@@ -95,10 +95,10 @@ function trainingSettings() {
     value.ppo_hidden_size = Number($('ppo-hidden-size').value);
   }
   if (gragMode()) {
-    const gammaInput = $('crl-gamma').value;
+    const gammaInput = $($('mode').value === 'grag' ? 'hindsight-gamma' : 'crl-gamma').value;
     const gamma = Number(gammaInput);
     if (gammaInput.trim() === '' || !Number.isFinite(gamma) || gamma <= 0 || gamma >= 1)
-      throw Error('対照学習の割引率は0より大きく1未満にしてください。');
+      throw Error('割引率は0より大きく1未満にしてください。');
     if ($('mode').value === 'grag') value.hindsight_gamma = gamma;
     else value.crl_gamma = gamma;
     const learningRate = Number($('crl-learning-rate').value);
@@ -346,7 +346,7 @@ function render(data) {
   if (result && (result.session_id !== data.session_id || result.mode !== data.mode || result.map.name !== data.map.name)) {
     closePolicyPopup(false);
     closeValuePopup();
-    valueToken++; valueGrid = null; valueKey = null; $('value-warning').hidden = true;
+    valueToken++; valueGrid = null; valueKey = null; valueGoal = null; valueSnapshotGoal = null; $('value-warning').hidden = true;
     drawValueMap();
   }
   result = data; syncControls();
@@ -357,8 +357,9 @@ function render(data) {
   drawHeat(data.map, data.visits); drawLive(data);
 }
 async function chooseMap() {
-  valueToken++; valueGrid = null; valueKey = null; $('value-section').hidden = true;
+  valueToken++; valueGrid = null; valueKey = null; valueGoal = null; valueSnapshotGoal = null; $('value-section').hidden = true;
   $('value-warning').hidden = true;
+  $('value-goal-error').hidden = true;
   closeValuePopup();
   closePolicyPopup(false);
   if (!$('map-list').value) return;
@@ -566,8 +567,9 @@ if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => redrawHeat()
       crl_device: 'sgcrl-device', crl_batch_size: 'crl-batch-size', crl_replay_cache_mb: 'crl-cache-mb' };
     for (const [key, id] of Object.entries(cppoFields)) ids['cppo_' + key] = id;
     for (const [key, id] of Object.entries(ids)) if (config[key] !== undefined) $(id).value = config[key] ?? '';
-    $('crl-gamma').value = ($('mode').value === 'grag' ? config.hindsight_gamma : config.crl_gamma) ?? 0.99;
-    $('crl-learning-rate').value = ($('mode').value === 'grag' ? config.contrastive_learning_rate : config.crl_learning_rate) ?? 0.0003;
+    $('hindsight-gamma').value = config.hindsight_gamma ?? 0.99;
+    $('crl-gamma').value = config.crl_gamma ?? 0.99;
+    $('crl-learning-rate').value = ($('mode').value === 'grag' ? config.contrastive_learning_rate ?? 0.00025 : config.crl_learning_rate ?? 0.0003);
     await chooseMap();
     initialized = true; syncControls(); poll();
     if (!maps.length) message('マップ作成アプリでマップを保存してください。');
@@ -576,8 +578,9 @@ if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => redrawHeat()
       if (!job?.job_id && !result?.session_id && !busy && maps.some(map => map.name === saved.map.name) && [...$('mode').options].some(option => option.value === saved.mode)) {
         $('map-list').value = saved.map.name; $('mode').value = saved.mode;
         for (const [key, id] of Object.entries(ids)) if (saved.settings[key] !== undefined) $(id).value = saved.settings[key] ?? '';
-        $('crl-gamma').value = (saved.mode === 'grag' ? saved.settings.hindsight_gamma : saved.settings.crl_gamma) ?? 0.99;
-        $('crl-learning-rate').value = (saved.mode === 'grag' ? saved.settings.contrastive_learning_rate : saved.settings.crl_learning_rate) ?? 0.0003;
+        $('hindsight-gamma').value = saved.settings.hindsight_gamma ?? 0.99;
+        $('crl-gamma').value = saved.settings.crl_gamma ?? 0.99;
+        $('crl-learning-rate').value = (saved.mode === 'grag' ? saved.settings.contrastive_learning_rate ?? 0.00025 : saved.settings.crl_learning_rate ?? 0.0003);
         render(saved);
         message('前回の学習状態を読み込みました。観察または高速学習を続けられます。');
       }
@@ -587,11 +590,17 @@ if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => redrawHeat()
 })();
 
 let valueGrid = null, valueMap = null, valueTimer = null, valueToken = 0, valueKey = null;
+let valueGoal = null, valueSnapshotGoal = null;
 function scheduleValueMap(data) {
   const visible = data?.mode === 'grag' && matches(data);
   $('value-section').hidden = !visible;
   if (!visible) { valueToken++; valueGrid = null; valueKey = null; closeValuePopup(); $('value-warning').hidden = true; return; }
-  const key = data.session_id + ':' + data.total_steps;
+  if (!valueGoal) {
+    valueGoal = [...data.map.goal];
+    $('value-goal-row').value = valueGoal[0]; $('value-goal-col').value = valueGoal[1];
+    $('value-goal-row').max = data.map.rows - 1; $('value-goal-col').max = data.map.cols - 1;
+  }
+  const key = data.session_id + ':' + data.total_steps + ':' + valueGoal.join(',');
   if (key === valueKey) return;
   valueKey = key;
   if (!valueTimer) valueTimer = setTimeout(() => { valueTimer = null; refreshValueMap(result); }, 1000);
@@ -601,7 +610,8 @@ async function refreshValueMap(data = result) {
   const token = ++valueToken;
   $('value-status').textContent = '価値を取得しています。';
   try {
-    const snapshot = await api('/api/train/grag-values', {session_id: data.session_id, mode: data.mode, map_name: data.map.name});
+    const requestedGoal = [...valueGoal];
+    const snapshot = await api('/api/train/grag-values', {session_id: data.session_id, mode: data.mode, map_name: data.map.name, goal: requestedGoal});
     if (token !== valueToken || !matches(result) || result.session_id !== data.session_id) return;
     if (!snapshot.values) {
       $('value-warning').textContent = snapshot.warning || '価値ヒートマップを取得できませんでした。';
@@ -609,9 +619,9 @@ async function refreshValueMap(data = result) {
       $('value-status').textContent = valueGrid ? '更新できませんでした。前回取得した値を表示しています。' : '価値を取得できませんでした。';
       return;
     }
-    valueGrid = snapshot.values; valueMap = data.map;
+    valueGrid = snapshot.values; valueMap = data.map; valueSnapshotGoal = snapshot.goal || requestedGoal;
     $('value-warning').hidden = true;
-    $('value-status').textContent = `学習 ${snapshot.completed_episodes}回 / ${snapshot.total_steps}ステップ時点の値`;
+    $('value-status').textContent = `目標 [${valueSnapshotGoal.join(', ')}] · 学習 ${snapshot.completed_episodes}回 / ${snapshot.total_steps}ステップ時点の値`;
     drawValueMap();
     if (selectedValueCell && valueAnchor && !$('value-popup').hidden) {
       openValueCell(selectedValueCell.row, selectedValueCell.col, valueAnchor.x, valueAnchor.y);
@@ -641,14 +651,13 @@ function drawValueMap() {
   if (canvas.height !== ph) canvas.height = ph;
   canvas.style.width = width + 'px'; canvas.style.height = height + 'px';
   context.setTransform(density, 0, 0, density, 0, 0);
-  const values = valueGrid.flat().filter(Boolean).map(cell => cell.value);
-  const min = Math.min(...values), max = Math.max(...values);
-  $('value-min').textContent = Number.isFinite(min) ? min.toPrecision(3) : '?';
-  $('value-max').textContent = Number.isFinite(max) ? max.toPrecision(3) : '?';
+  // 正規化された表現の内積と、その方策期待値は -1〜1 に収まる。
+  $('value-min').textContent = '-1';
+  $('value-max').textContent = '+1';
   $('value-zoom-value').value = Math.round(zoom * 100) + '%';
   context.fillStyle = '#dce6eb'; context.fillRect(0, 0, width, height);
   for (let r = 0; r < valueMap.rows; r++) for (let c = 0; c < valueMap.cols; c++) {
-    const cell = valueGrid[r][c], ratio = cell ? (cell.value - min) / (max - min || 1) : 0;
+    const cell = valueGrid[r][c], ratio = cell ? Math.max(0, Math.min(1, (cell.value + 1) / 2)) : 0;
     context.fillStyle = cell ? 'rgb(' + Math.round(255 - 35 * ratio) + ',' + Math.round(255 - 158 * ratio) + ',' + Math.round(255 - 180 * ratio) + ')' : '#354f60';
     context.fillRect(c * unit + 1, r * unit + 1, unit - 2, unit - 2);
     if (cell) {
@@ -657,6 +666,12 @@ function drawValueMap() {
       context.textAlign = 'center'; context.textBaseline = 'middle';
       context.fillText(cell.value.toPrecision(3), (c + .5) * unit, (r + .5) * unit, Math.max(1, unit - 8));
     }
+  }
+  if (valueSnapshotGoal) {
+    const [r, c] = valueSnapshotGoal;
+    context.fillStyle = '#078878'; context.beginPath();
+    context.arc((c + 0.84) * unit, (r + 0.16) * unit, Math.max(2, unit * .08), 0, Math.PI * 2);
+    context.fill();
   }
   if (selectedValueCell) { context.strokeStyle = '#078878'; context.lineWidth = Math.max(3, unit * .045); context.strokeRect(selectedValueCell.col * unit + 3, selectedValueCell.row * unit + 3, unit - 6, unit - 6); }
 }
@@ -667,15 +682,29 @@ function openValueCell(row, col, x, y) {
   $('value-title').textContent = `マス [${row}, ${col}] の行動価値`;
   $('value-snapshot').textContent = $('value-status').textContent;
   const directions = [['up','↑ 上'],['down','↓ 下'],['left','← 左'],['right','→ 右']];
-  const best = Math.max(...directions.map(([key]) => cell.advantages[key]));
+  const qValues = directions.map(([key]) => cell.q_values[key]);
+  const best = Math.max(...qValues);
+  const worst = Math.min(...qValues);
+  const scaleRange = best - worst;
+  $('value-scale').textContent = scaleRange === 0 ? '4方向の Q 値は同じです。' :
+    `このマスの範囲：${worst.toPrecision(9)} 〜 ${best.toPrecision(9)}`;
   $('value-actions').replaceChildren(...directions.map(([key,label]) => {
     const row = document.createElement('div'), name = document.createElement('span');
-    const qValue = document.createElement('span'), advantage = document.createElement('strong');
-    row.className = 'value-action' + (cell.advantages[key] === best ? ' best' : '');
+    const track = document.createElement('div'), fill = document.createElement('div');
+    const qValue = document.createElement('strong');
+    const advantage = document.createElement('small');
+    const q = cell.q_values[key];
+    const width = scaleRange === 0 ? 100 : (q - worst) / scaleRange * 100;
+    row.className = 'value-action' + (q === best ? ' best' : '');
     name.className = 'action-label'; name.textContent = label;
-    qValue.textContent = 'Q ' + cell.q_values[key].toPrecision(3);
+    track.className = 'value-q-track'; track.setAttribute('aria-hidden', 'true');
+    fill.className = 'value-q-fill';
+    fill.style.width = width + '%';
+    track.append(fill);
+    qValue.className = 'value-q-number'; qValue.textContent = 'Q ' + q.toPrecision(9);
+    advantage.className = 'value-advantage';
     advantage.textContent = 'A ' + (cell.advantages[key] > 0 ? '+' : '') + cell.advantages[key].toPrecision(3);
-    row.append(name, qValue, advantage); return row;
+    row.append(name, track, qValue, advantage); return row;
   }));
   const popup = $('value-popup'); popup.hidden = false;
   const rect = popup.getBoundingClientRect(), margin = 12;
@@ -683,6 +712,25 @@ function openValueCell(row, col, x, y) {
   popup.style.top = Math.max(margin, Math.min(y + 14, window.innerHeight - rect.height - margin)) + 'px';
 }
 $('value-refresh').onclick = () => refreshValueMap();
+$('value-goal-apply').onclick = () => {
+  if (!result || !matches(result)) return;
+  const rowInput = $('value-goal-row').value, colInput = $('value-goal-col').value;
+  const row = Number(rowInput), col = Number(colInput), map = result.map;
+  if (rowInput.trim() === '' || colInput.trim() === '' || !integer(row, 0, map.rows - 1) ||
+      !integer(col, 0, map.cols - 1) || map.obstacles.some(([r, c]) => r === row && c === col)) {
+    $('value-goal-error').textContent = '障害物でないマップ範囲内の座標を入力してください。';
+    $('value-goal-error').hidden = false; return;
+  }
+  $('value-goal-error').hidden = true; valueGoal = [row, col]; valueKey = null;
+  refreshValueMap();
+};
+$('value-goal-reset').onclick = () => {
+  if (!result || !matches(result)) return;
+  $('value-goal-row').value = result.map.goal[0]; $('value-goal-col').value = result.map.goal[1];
+  $('value-goal-apply').click();
+};
+$('value-zoom').value = '100';
+$('value-zoom-value').value = '100%';
 $('value-zoom').oninput = drawValueMap;
 $('value-fit').onclick = () => { $('value-zoom').value = '100'; drawValueMap(); $('value-map').parentElement.scrollTo(0, 0); };
 $('value-close').onclick = closeValuePopup;

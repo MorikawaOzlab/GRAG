@@ -237,6 +237,12 @@ def run_job(job: dict, selected: dict, settings: dict, mode: str) -> None:
                 job["_wake"].wait(delay / 1000)
                 job["_wake"].clear()
     except Exception as error:
+        pause_learning = getattr(session.agent, "pause_learning", None) if session is not None else None
+        if callable(pause_learning):
+            try:
+                pause_learning()
+            except Exception:
+                pass
         if job.get("benchmark"):
             session.benchmark["status"] = "error"
         with job_lock:
@@ -311,7 +317,9 @@ class TrainingHandler(Handler):
                 configure_ppo_cpu_threads()
             if path == "/api/train/grag-values":
                 try:
-                    data = session.inspect_grag_values()
+                    data = session.inspect_grag_values(request.get("goal"))
+                except ValueError:
+                    raise
                 except Exception:
                     data = {"values": None, "warning": "価値ヒートマップを取得できませんでした。"}
             else:

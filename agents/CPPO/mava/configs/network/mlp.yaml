@@ -1,0 +1,13 @@
+actor_network:
+  pre_torso:
+    _target_: mava.networks.torsos.MLPTorso
+    layer_sizes: [512, 512]
+    use_layer_norm: False
+    activation: relu
+
+critic_network:
+  pre_torso:
+    _target_: mava.networks.torsos.MLPTorso
+    layer_sizes: [512, 512]
+    use_layer_norm: False
+    activation: relu

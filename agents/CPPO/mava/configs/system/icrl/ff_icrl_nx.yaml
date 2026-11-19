@@ -1,0 +1,43 @@
+
+seed: 1
+
+total_timesteps: ~
+num_updates: 1250
+update_batch_size: 1
+
+# Rollout / replay
+rollout_length: 128
+explore_steps: 1000
+buffer_size: 5000
+batch_size: 256
+
+# Learning rates
+policy_lr: 3e-4
+q_lr: 3e-4
+alpha_lr: 3e-4
+max_grad_norm: 0.5
+
+# RL
+gamma: 0.99
+
+# Entropy autotuning
+autotune: true
+target_entropy_scale: 0.89
+init_alpha: 0.1
+alpha_min: 0.01
+
+# Contrastive critic
+logsumexp_penalty_coeff: 0.1
+rep_size: 64
+energy_fn: "norm"
+energy_eps: 1e-6
+contrastive_loss_fn: "fwd_infonce"
+
+# Actor head
+actor_mlp_hidden: 256
+log_std_min: -5.0
+log_std_max: 2.0
+
+# Set at runtime by learner_setup
+obs_size: ~
+action_size: ~

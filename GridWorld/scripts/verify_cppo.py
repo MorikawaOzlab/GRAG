@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / "GridWorld"))
 
 import torch
 
-from agents.cppo import CPPOAgent
+from agents.cppo import CPPOAgent, DEFAULTS
 from gridworld.storage import DEFAULT_SETTINGS
 from gridworld.training_runtime import TrainingSession
 
@@ -22,12 +22,13 @@ def main():
     parser.add_argument("--episodes", type=int, default=1000)
     parser.add_argument("--seeds", type=int, nargs="+", default=[7, 42, 123])
     parser.add_argument("--map", type=Path)
-    parser.add_argument("--hidden-size", type=int, default=512)
-    parser.add_argument("--depth", type=int, default=4)
+    parser.add_argument("--hidden-size", type=int, default=DEFAULTS["hidden_size"])
+    parser.add_argument("--depth", type=int, default=DEFAULTS["depth"])
     parser.add_argument("--max-steps", type=int, default=16)
-    parser.add_argument("--rollout-steps", type=int, default=65536)
-    parser.add_argument("--entropy-coef", type=float, default=.01)
-    parser.add_argument("--no-normalize-advantage", action="store_true")
+    parser.add_argument("--rollout-steps", type=int, default=DEFAULTS["rollout_steps"])
+    parser.add_argument("--entropy-coef", type=float, default=DEFAULTS["entropy_coef"])
+    parser.add_argument("--normalize-advantage", action=argparse.BooleanOptionalAction,
+                        default=DEFAULTS["normalize_advantage"])
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     torch.set_num_threads(1)
@@ -39,14 +40,14 @@ def main():
                 "cppo_hidden_size": args.hidden_size, "cppo_depth": args.depth,
                 "cppo_rollout_steps": args.rollout_steps,
                 "cppo_entropy_coef": args.entropy_coef,
-                "cppo_normalize_advantage": not args.no_normalize_advantage}
+                "cppo_normalize_advantage": args.normalize_advantage}
     results = []
     for seed in args.seeds:
         session = TrainingSession(maze, {**settings, "seed": seed}, CPPOAgent)
-        before = session.evaluate()
+        before = session.evaluate(force_greedy=True)
         started = monotonic()
         session.run_batch(args.episodes)
-        frames = session.evaluate()
+        frames = session.evaluate(force_greedy=True)
         summary = {"seed": seed, "episodes": args.episodes, "steps": session.total_steps,
                    "updates": session.agent.updates,
                    "initial_greedy_success": before[-1]["reached_goal"],

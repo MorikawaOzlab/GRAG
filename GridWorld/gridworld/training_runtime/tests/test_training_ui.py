@@ -174,7 +174,7 @@ class TrainingUITests(unittest.TestCase):
                         'cppo_depth': 2, 'cppo_repr_dim': 8, 'cppo_batch_size': 8, 'cppo_rollout_steps': 12}})
         self.wait_status(lambda state: state['status'] == 'paused')
         saved = json.loads((root / 'training_sessions' / (job['session_id'] + '.json')).read_text())
-        self.assertEqual(saved['agent_checkpoint']['model']['schema_version'], 2)
+        self.assertEqual(saved['agent_checkpoint']['model']['schema_version'], 3)
         self.assertGreater(saved['agent_checkpoint']['model']['updates'], 0)
         self.assertIsNone(saved['q_table'])
         latest = json.loads((root / 'latest_result.json').read_text())

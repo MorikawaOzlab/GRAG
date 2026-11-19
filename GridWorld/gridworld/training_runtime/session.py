@@ -10,18 +10,22 @@ from agents.q_learning import ACTIONS, QLearningAgent
 from gridworld.world import GridWorld
 
 
-def evaluate_policy(map_data: dict, settings: dict, agent) -> list[dict]:
+def evaluate_policy(map_data: dict, settings: dict, agent, *, force_greedy: bool = False) -> list[dict]:
     """互換用の方策評価。学習中の状態・乱数は変更しない。"""
     clone = getattr(agent, "evaluation_copy", None)
     restore = getattr(type(agent), "from_export", None)
     policy = (clone() if callable(clone) else restore(agent.export())
               if callable(restore) else deepcopy(agent))
+    evaluation_action = getattr(policy, "evaluation_action", None)
     world = GridWorld(map_data)
     observation = world.reset()
     frames = [{"position": observation["position"], "action": None,
                "collision": False, "reached_goal": False}]
     for _ in range(settings["max_steps"]):
-        action = policy.choose_action(observation, greedy=True)
+        if not force_greedy and callable(evaluation_action):
+            action = evaluation_action(observation)
+        else:
+            action = policy.choose_action(observation, greedy=True)
         observation, reached_goal, collision = world.step(action)
         frames.append({"position": observation["position"], "action": action,
                        "collision": collision, "reached_goal": reached_goal})
@@ -198,10 +202,18 @@ class TrainingSession:
                             if position == self.world.map["goal"] else
                             "衝突する方向も選択対象に含まれます。"}
 
-    def inspect_grag_values(self) -> dict:
-        """各マスの方策による期待Q値と行動ごとの差を返す。"""
+    def inspect_grag_values(self, goal=None) -> dict:
+        """指定ゴールに対する期待Q値と行動ごとの差を返す。"""
         import torch
         from agents.grag_impl.grag import GRAG
+        if goal is None:
+            goal = list(self.world.map["goal"])
+        if (not isinstance(goal, list) or len(goal) != 2
+                or any(type(x) is not int for x in goal)
+                or not 0 <= goal[0] < self.world.map["rows"]
+                or not 0 <= goal[1] < self.world.map["cols"]
+                or goal in self.world.map["obstacles"]):
+            raise ValueError("目標座標は障害物でない範囲内の[行, 列]にしてください。")
         with self._lock:
             if not isinstance(self.agent, GRAG) or self.agent.actor is None:
                 return {"values": None}
@@ -213,6 +225,7 @@ class TrainingSession:
                         continue
                     observation = self.world.observation()
                     observation["position"] = [r, c]
+                    observation["goal"] = goal.copy()
                     observations.append(observation)
                     positions.append((r, c))
             with torch.no_grad():
@@ -231,11 +244,11 @@ class TrainingSession:
                 if math.isfinite(value) and all(math.isfinite(x) for x in adv):
                     grid[r][c] = {"value": value, "advantages": dict(zip(self.agent.actions, adv)),
                                   "q_values": dict(zip(self.agent.actions, map(float, q[i])))}
-            return {"values": grid, "completed_episodes": self.completed_episodes, "total_steps": self.total_steps}
+            return {"values": grid, "goal": goal.copy(), "completed_episodes": self.completed_episodes, "total_steps": self.total_steps}
 
-    def evaluate(self) -> list[dict]:
+    def evaluate(self, *, force_greedy: bool = False) -> list[dict]:
         with self._lock:
-            self.frames = evaluate_policy(self.world.map, self.settings, self.agent)
+            self.frames = evaluate_policy(self.world.map, self.settings, self.agent, force_greedy=force_greedy)
             return deepcopy(self.frames)
 
     def result(self, *, checkpoint: bool = False, compact: bool = False) -> dict:

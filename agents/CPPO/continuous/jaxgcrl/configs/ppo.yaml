@@ -1,0 +1,30 @@
+defaults:
+  - logger: logger
+  - system: ppo
+  - env: ant
+  - _self_
+
+agent: ppo
+
+run:
+  seed: 0
+  total_env_steps: 80_000_000
+  num_envs: 512
+  num_eval_envs: 2048
+  episode_length: 1000
+  num_evals: 80
+  action_repeat: 1
+  cuda: true
+  max_devices_per_host: 1
+
+  exp_name: ppo_${env.env_name}_seed${run.seed}_${now:%Y-%m-%d}
+  log_wandb: true
+  wandb_project_name: cppo-jaxgcrl
+  wandb_group: ppo-${env.env_name}-${now:%Y-%m-%d}
+  wandb_mode: online
+
+  absolute_num_eval_envs: 8192
+
+  visualization_interval: 5
+  vis_length: 1000
+  checkpoint_logdir: null

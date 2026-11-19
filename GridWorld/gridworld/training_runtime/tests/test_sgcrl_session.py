@@ -1,6 +1,7 @@
 """SGCRL integration with GridWorld's step, inspection, evaluation and resume APIs."""
 
 import json
+import time
 import unittest
 
 import torch
@@ -24,7 +25,7 @@ class SGCRLSessionTests(unittest.TestCase):
         maze = {"name": "SGCRL integration", "rows": 2, "cols": 3,
                 "start": [0, 0], "goal": [1, 2], "obstacles": [[0, 1]]}
         settings = {**DEFAULT_SETTINGS, "max_steps": 8, "crl_min_replay_size": 8,
-                    "crl_batch_size": 8, "crl_hidden_size": 16}
+                    "crl_batch_size": 8, "crl_hidden_size": 16, "crl_async_updates": False}
         return TrainingSession(maze, settings, GridWorldSGCRL)
 
     def test_json_checkpoint_mid_episode_resumes_identically(self):
@@ -55,6 +56,26 @@ class SGCRLSessionTests(unittest.TestCase):
         self.assertTrue(torch.equal(before_random, session.agent.core._action_generator.get_state()))
         for _ in range(12):
             self.assertEqual(session.step(), control.step())
+
+    def test_background_training_checkpoint_and_resume(self):
+        maze = {"name": "async", "rows": 2, "cols": 3,
+                "start": [0, 0], "goal": [1, 2], "obstacles": []}
+        settings = {**DEFAULT_SETTINGS, "max_steps": 4, "crl_min_replay_size": 4,
+                    "crl_batch_size": 4, "crl_hidden_size": 16, "crl_device": "cpu"}
+        session = TrainingSession(maze, settings, GridWorldSGCRL)
+        for _ in range(20):
+            session.step()
+        deadline = time.monotonic() + 10
+        while session.agent._updates == 0 and time.monotonic() < deadline:
+            time.sleep(.01)
+        self.assertGreater(session.agent._updates, 0)
+        saved = json.loads(json.dumps(session.result(checkpoint=True)))
+        self.assertFalse(session.agent.core._learning_enabled)
+        restored = TrainingSession.restore(saved, GridWorldSGCRL)
+        self.assertEqual(restored.agent._updates, session.agent._updates)
+        restored.step()
+        self.assertTrue(restored.agent.core._learning_enabled)
+        restored.agent.core.pause_learning()
 
 
 if __name__ == "__main__":

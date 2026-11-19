@@ -1,0 +1,21 @@
+
+defaults:
+  - logger: logger
+  - arch: anakin
+  - env: navix  # [mpe, smax, vector-connector]
+  - system: q_learning/dqn_crl_nx
+  - network: navix
+  - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs
+
+
+logger:
+  loggers:
+    json:
+      task_name: ${env.env_name}
+
+arch: 
+  evaluation_greedy: true 

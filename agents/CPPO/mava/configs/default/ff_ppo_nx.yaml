@@ -1,0 +1,15 @@
+
+defaults:
+  - logger: logger
+  - arch: anakin
+  - env: navix
+  - system: ppo/ff_ppo_nx
+  - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs
+logger:
+  loggers:
+    json:
+      task_name: ${env.env_name}

@@ -29,6 +29,35 @@ PPO_SETTINGS = {**SETTINGS, "seed": 7, "max_steps": 6, "ppo_hidden_size": 8,
 
 @unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is required")
 class GRAGValueInspectionTests(unittest.TestCase):
+    def test_selected_goal_is_used_by_actor_and_critic_without_changing_session(self):
+        import torch
+        session = TrainingSession(MAP, PPO_SETTINGS, GRAGSession)
+        agent = session.agent
+        goal = [1, 0]
+        before_map = deepcopy(session.world.map)
+        before_rng = agent._generator.get_state().clone()
+        snapshot = session.inspect_grag_values(goal)
+        observation = {**session.world.observation(), "goal": goal}
+        state = agent._prepare_state(observation).reshape(1, -1)
+        with torch.no_grad():
+            q = agent.q_values(state, torch.tensor([goal], dtype=torch.float32))[0]
+            probabilities = agent.actor(state).softmax(-1)[0]
+        row, col = observation["position"]
+        cell = snapshot["values"][row][col]
+        self.assertEqual(snapshot["goal"], goal)
+        self.assertAlmostEqual(cell["value"], (probabilities * q).sum().item(), places=5)
+        for i, action in enumerate(agent.actions):
+            self.assertAlmostEqual(cell["q_values"][action], q[i].item(), places=5)
+        self.assertEqual(session.world.map, before_map)
+        self.assertTrue(torch.equal(before_rng, agent._generator.get_state()))
+        self.assertEqual(session.inspect_grag_values()["goal"], MAP["goal"])
+
+    def test_goal_rejects_out_of_bounds_or_wall(self):
+        session = TrainingSession(MAP, PPO_SETTINGS, GRAGSession)
+        for goal in ([0, 1], [-1, 0], [2, 0], [0, True], "0,0", [0]):
+            with self.subTest(goal=goal), self.assertRaises(ValueError):
+                session.inspect_grag_values(goal)
+
     def test_values_match_current_q_and_leave_training_state_unchanged(self):
         import torch
         session = TrainingSession(MAP, PPO_SETTINGS, GRAGSession)
@@ -220,6 +249,19 @@ class PolicyApiTests(unittest.TestCase):
                 "session_id": sid, "mode": "grag", "map_name": MAP["name"]})
         self.assertIsNone(result["values"])
         self.assertIn("warning", result)
+
+    @unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is required")
+    def test_grag_values_api_selects_and_validates_goal(self):
+        sid = "b" * 32
+        session = TrainingSession(MAP, PPO_SETTINGS, GRAGSession)
+        training_app.learning_sessions[sid] = {"mode": "grag", "session": session}
+        request = {"session_id": sid, "mode": "grag", "map_name": MAP["name"], "goal": [1, 0]}
+        result = self.post("/api/train/grag-values", request)
+        self.assertEqual(result["goal"], [1, 0])
+        self.assertIsNotNone(result["values"][0][0])
+        with self.assertRaises(HTTPError) as error:
+            self.post("/api/train/grag-values", {**request, "goal": [0, 1]})
+        self.assertEqual(error.exception.code, 400)
 
     def test_saved_policy_inspection_does_not_start_jobs_write_files_or_cache_models(self):
         result = self.wait(self.post("/api/train", {"map_name": MAP["name"], "episodes": 2}))

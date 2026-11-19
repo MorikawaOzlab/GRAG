@@ -1,0 +1,26 @@
+
+seed: 1
+
+total_timesteps: ~
+num_updates: 1250
+
+rollout_length: 128
+num_minibatches: 8   # batch_size = num_envs * rollout_length / num_minibatches
+ppo_epochs: 4
+
+# Learning rates
+actor_lr: 5e-4
+critic_lr: 5e-4
+max_grad_norm: 0.5
+lr_decay_type: "linear"
+lr_end: 0.0
+
+# RL
+gamma: 0.999
+gae_lambda: 0.95
+clip_eps: 0.2
+ent_coef: 0.01
+vf_coef: 0.5
+
+# Set at runtime
+action_size: ~

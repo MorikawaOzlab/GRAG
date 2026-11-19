@@ -1,326 +1,456 @@
-"""Single-file GridWorld adaptation of Contrastive PPO (arXiv:2605.13554v1).
+"""PyTorch port of CPPO's discrete Navix learner for the GridWorld runtime.
 
-Implements Eqs. 3, 6, 7, 9 and Algorithm 1 without environment rewards,
-replay, target networks or a value head. The UI supplies full map observations;
-the achieved/target goal is the grid coordinate, as in the paper's Navix tasks.
-Unlike the paper's 512 parallel environments, complete episodes are collected
-sequentially under one frozen policy, then discarded after an on-policy update.
-Defaults follow Appendix D where applicable. HER uses a truncated discounted
-future distribution; same-episode negatives are masked. Advantages are frozen
-before encoder updates following Algorithm 1. See GridWorld/CPPO.md for details.
-
-Only dependency: torch. No imports from other agents or the GridWorld runtime.
+Reference: CPPO/mava/systems/icrl/anakin/ff_ppo_crl_nx.py.
+GridWorld supplies one live environment. Collect sequential fixed-length
+windows with a frozen policy in place of Navix's parallel streams.
 """
 
-from copy import deepcopy
 import base64
+from copy import deepcopy
 import io
 import math
 import secrets
 
 
 ACTIONS = ("up", "down", "left", "right")
+DEFAULTS = {
+    "hidden_size": 1024, "depth": 4, "actor_hidden_size": 256, "repr_dim": 64,
+    "rollout_steps": 128 * 512, "rollout_length": 128, "batch_size": 512,
+    "epochs": 1, "total_updates": 1250, "learning_rate": 2.5e-4,
+    "critic_learning_rate": 2.5e-4,
+    "gamma": 0.99, "clip_coef": 0.2, "entropy_coef": 0.01,
+    "max_grad_norm": 0.5, "lr_end": 1e-7, "logsumexp_penalty_coef": 0.1,
+    "normalize_advantage": True, "evaluation_greedy": False,
+    "energy_fn": "norm", "contrastive_loss_fn": "fwd_infonce", "lr_decay_type": "cosine",
+}
+
+CHOICES = {
+    "energy_fn": ("norm", "l2", "dot", "cosine"),
+    "contrastive_loss_fn": ("fwd_infonce", "bwd_infonce", "sym_infonce", "binary_nce"),
+    "lr_decay_type": ("none", "linear", "cosine"),
+}
 
 
 class CPPOAgent:
     display_name = "CPPO"
     CHECKPOINT_INCLUDES_MODEL = True
+    SCHEMA_VERSION = 3
 
-    def __init__(self, settings: dict):
-        try:
-            import torch
-        except ImportError as error:
-            raise RuntimeError("CPPOにはPyTorchが必要です。python -m pip install torch を実行してください。") from error
+    def __init__(self, settings):
+        import torch
+
         self.torch = torch
         self.settings = deepcopy(settings)
         self.config = {}
-        defaults = {"hidden_size": 512, "depth": 4, "repr_dim": 64,
-                    "rollout_steps": 128 * 512, "batch_size": 256, "epochs": 1,
-                    "total_updates": 1250, "learning_rate": 2.5e-4,
-                    "gamma": .99, "clip_coef": .2, "entropy_coef": .01,
-                    "max_grad_norm": .5, "lr_end": 1e-7, "normalize_advantage": True}
-        integer_keys = {"hidden_size", "depth", "repr_dim", "rollout_steps",
-                        "batch_size", "epochs", "total_updates"}
-        for key, default in defaults.items():
+        for key, default in DEFAULTS.items():
+            if key == "critic_learning_rate":
+                default = self.config["learning_rate"]
             value = settings.get("cppo_" + key, default)
-            if key == "normalize_advantage":
-                if type(value) is not bool:
-                    raise ValueError("cppo_normalize_advantageは真偽値にしてください。")
-            elif key in integer_keys:
-                minimum = 2 if key in {"batch_size", "rollout_steps"} else 1
-                if type(value) is not int or not minimum <= value <= 1_000_000:
-                    raise ValueError(f"cppo_{key}は{minimum}以上の整数にしてください。")
-            elif (isinstance(value, bool) or not isinstance(value, (int, float))
-                  or not math.isfinite(value) or value < 0):
-                raise ValueError(f"cppo_{key}は有限の非負数にしてください。")
+            if key in CHOICES:
+                valid = isinstance(value, str) and value in CHOICES[key]
+            elif type(default) is bool:
+                valid = type(value) is bool
+            elif type(default) is int:
+                minimum = 2 if key in {"rollout_length", "rollout_steps", "batch_size"} else 1
+                valid = type(value) is int and minimum <= value <= 1_000_000
+            else:
+                valid = type(value) in (int, float) and math.isfinite(value) and value >= 0
+            if not valid:
+                raise ValueError(f"Invalid CPPO setting: cppo_{key}={value!r}")
             self.config[key] = value
-        if not 0 < self.config["gamma"] < 1:
-            raise ValueError("cppo_gammaは0より大きく1未満にしてください。")
-        if not 0 < self.config["clip_coef"] < 1:
-            raise ValueError("cppo_clip_coefは0より大きく1未満にしてください。")
-        if self.config["learning_rate"] <= 0 or self.config["max_grad_norm"] <= 0:
-            raise ValueError("CPPOの学習率と勾配上限は正数にしてください。")
-        if self.config["lr_end"] > self.config["learning_rate"]:
-            raise ValueError("cppo_lr_endは初期学習率以下にしてください。")
+        for key in ("gamma", "clip_coef"):
+            if not 0 < self.config[key] < 1:
+                raise ValueError(f"cppo_{key} must be between zero and one")
+        min_lr = min(self.config["learning_rate"], self.config["critic_learning_rate"])
+        if min_lr <= 0 or self.config["max_grad_norm"] <= 0:
+            raise ValueError("CPPO learning rate and gradient norm limit must be positive")
+        if self.config["lr_end"] > min_lr:
+            raise ValueError("cppo_lr_end must not exceed either initial learning rate")
+
         self.settings.update({"cppo_" + key: value for key, value in self.config.items()})
         self.seed = settings.get("seed")
         if self.seed is None:
             self.seed = secrets.randbits(32)
         self.generator = torch.Generator(device="cpu").manual_seed(self.seed)
-        self.map = None
-        self.networks = self.actor = self.sa_encoder = self.goal_encoder = None
-        self.optimizer = None
-        self.episodes = []
-        self.trajectory = []
+        self.map = self.networks = self.actor_optimizer = self.critic_optimizer = None
+        self.rollout = []
         self.pending = None
-        self.updates = 0
+        self.episode_id = 0
+        self.updates = self.gradient_steps = 0
         self.metrics = {}
 
     def _initialize(self, observation):
-        torch = self.torch
-        nn = torch.nn
         layout = {key: deepcopy(observation[key]) for key in ("rows", "cols", "obstacles", "goal")}
         if self.map is not None:
             if layout != self.map:
-                raise ValueError("CPPOの学習中にマップを変更できません。")
+                raise ValueError("CPPO requires a fixed GridWorld map within a session")
             return
-        self.map = layout
-        cells = layout["rows"] * layout["cols"]
 
-        def mlp(inputs, outputs, output_gain=1.0):
+        torch = self.torch
+        nn = torch.nn
+        rows, cols = layout["rows"], layout["cols"]
+        # Navix uses a limited view. With no heading in GridWorld, use a
+        # north-up neighborhood with radius three on large map dimensions.
+        self.view_shape = (min(rows, 7), min(cols, 7))
+        self.view_padding = (3 if rows > 7 else 0, 3 if cols > 7 else 0)
+        features = math.prod(self.view_shape) * 64
+
+        # Flax SAME padding puts the extra row and column after the input.
+        def trunk():
             layers = []
-            for _ in range(self.config["depth"]):
-                layer = nn.Linear(inputs, self.config["hidden_size"])
-                nn.init.orthogonal_(layer.weight, math.sqrt(2))
-                nn.init.zeros_(layer.bias)
-                layers.extend([layer, nn.LayerNorm(self.config["hidden_size"]), nn.SiLU()])
-                inputs = self.config["hidden_size"]
-            layer = nn.Linear(inputs, outputs)
-            nn.init.orthogonal_(layer.weight, output_gain)
-            nn.init.zeros_(layer.bias)
-            return nn.Sequential(*layers, layer)
+            for inputs, outputs in ((3, 16), (16, 32), (32, 64)):
+                layers.extend((nn.ZeroPad2d((0, 1, 0, 1)), nn.Conv2d(inputs, outputs, 2), nn.SiLU()))
+            return nn.Sequential(*layers)
+
+        def head(inputs, width, depth, outputs, layer_norm=False):
+            layers = []
+            for _ in range(depth):
+                layers.append(nn.Linear(inputs, width))
+                if layer_norm:
+                    layers.append(nn.LayerNorm(width, eps=1e-6))
+                layers.append(nn.SiLU())
+                inputs = width
+            return nn.Sequential(*layers, nn.Linear(inputs, outputs))
 
         with torch.random.fork_rng(devices=[]):
             torch.random.default_generator.manual_seed(self.seed)
-            self.actor = mlp(2 * cells + 2, 4, .01)
-            self.sa_encoder = mlp(2 * cells + 4, self.config["repr_dim"])
-            self.goal_encoder = mlp(2, self.config["repr_dim"])
-            self.networks = nn.ModuleDict({"actor": self.actor, "sa": self.sa_encoder,
-                                          "goal": self.goal_encoder})
-        self.optimizer = torch.optim.Adam(self.networks.parameters(),
-                                          lr=self.config["learning_rate"], eps=1e-5)
+            width, depth, rep = (self.config[key] for key in ("hidden_size", "depth", "repr_dim"))
+            self.networks = nn.ModuleDict({
+                "actor_trunk": trunk(),
+                "actor": head(features + 4, self.config["actor_hidden_size"], 2, len(ACTIONS)),
+                "sa_trunk": trunk(),
+                "sa": head(features + 2 + len(ACTIONS), width, depth, rep, layer_norm=True),
+                "goal": head(2, width, depth, rep, layer_norm=True),
+            })
+            # PyTorch's default Conv/Linear kernels already use the same
+            # fan-in uniform bounds as variance_scaling(1/3, "fan_in", "uniform").
+            for module in self.networks.modules():
+                if isinstance(module, (nn.Linear, nn.Conv2d)):
+                    nn.init.zeros_(module.bias)
+            nn.init.orthogonal_(self.networks["actor"][-1].weight, 0.01)
+
+        lr = self.config["learning_rate"]
+        self.actor_optimizer = torch.optim.Adam(self._parameters("actor", "actor_trunk"), lr=lr, eps=1e-5)
+        self.critic_optimizer = torch.optim.Adam(self._parameters("sa", "sa_trunk", "goal"),
+                                                 lr=self.config["critic_learning_rate"], eps=1e-8)
+        self.map = layout
+        self.target = torch.tensor(layout["goal"], dtype=torch.float32)
+        self.grid = torch.zeros(3, rows, cols)
+        for row, col in layout["obstacles"]:
+            self.grid[0, row, col] = 1
+        goal_row, goal_col = layout["goal"]
+        self.grid[1, goal_row, goal_col] = 1
+        pad_y, pad_x = self.view_padding
+        if pad_y or pad_x:
+            pad = (pad_x, pad_x, pad_y, pad_y)
+            functional = torch.nn.functional
+            self.grid = torch.cat((functional.pad(self.grid[:1], pad, value=1),
+                                   functional.pad(self.grid[1:], pad)), dim=0)
+
+    def _parameters(self, *names):
+        return [param for name in names for param in self.networks[name].parameters()]
 
     def _state(self, observation):
         self._initialize(observation)
-        cells = self.map["rows"] * self.map["cols"]
-        state = [0.] * (2 * cells)
-        for row, col in self.map["obstacles"]:
-            state[row * self.map["cols"] + col] = 1.
-        row, col = observation["position"]
-        state[cells + row * self.map["cols"] + col] = 1.
-        return state
+        return list(observation["position"])
 
-    def _distribution(self, states):
-        target = self.torch.tensor(self.map["goal"], dtype=self.torch.float32)
-        goals = target.expand(states.shape[0], -1)
-        return self.torch.distributions.Categorical(logits=self.actor(self.torch.cat([states, goals], -1)))
+    def _features(self, positions, trunk):
+        torch = self.torch
+        rows, cols = positions.long().unbind(dim=1)
+        height, width = self.view_shape
+        pad_y, pad_x = self.view_padding
+        row_start = rows if pad_y else torch.zeros_like(rows)
+        col_start = cols if pad_x else torch.zeros_like(cols)
+        y = row_start[:, None, None] + torch.arange(height)[None, :, None]
+        x = col_start[:, None, None] + torch.arange(width)[None, None, :]
+        grid = self.grid[:, y, x].permute(1, 0, 2, 3)
+        grid[torch.arange(len(positions)), 2, rows + pad_y - row_start, cols + pad_x - col_start] = 1
+        return self.networks[trunk](grid).permute(0, 2, 3, 1).flatten(1)
+
+    def _distribution(self, positions):
+        torch = self.torch
+        features = self._features(positions, "actor_trunk")
+        inputs = torch.cat((features, positions.float(), self.target.expand(len(positions), -1)), dim=-1)
+        return torch.distributions.Categorical(logits=self.networks["actor"](inputs))
 
     def choose_action(self, observation, greedy=False):
         torch = self.torch
-        state = self._state(observation)
+        position = self._state(observation)
         with torch.no_grad():
-            distribution = self._distribution(torch.tensor([state]))
+            policy = self._distribution(torch.tensor([position]))
             if greedy:
-                return ACTIONS[int(distribution.probs.argmax(-1).item())]
+                return ACTIONS[policy.probs[0].argmax().item()]
             if self.pending is not None:
-                raise RuntimeError("次の行動選択前にlearn()を呼んでください。")
-            action = int(torch.multinomial(distribution.probs[0], 1, generator=self.generator).item())
-            self.pending = {"state": state, "action": action,
-                            "log_prob": float(distribution.log_prob(torch.tensor(action)).item())}
+                raise RuntimeError("Call learn() before sampling the next action")
+            action = torch.multinomial(policy.probs[0], 1, generator=self.generator).item()
+            self.pending = (position, action, policy.logits[0, action].item())
         return ACTIONS[action]
 
     def action_probabilities(self, observation):
+        with self.torch.no_grad():
+            policy = self._distribution(self.torch.tensor([self._state(observation)]))
+            return dict(zip(ACTIONS, policy.probs[0].tolist()))
+
+    def evaluation_action(self, observation):
         torch = self.torch
+        position = self._state(observation)
         with torch.no_grad():
-            probabilities = self._distribution(torch.tensor([self._state(observation)])).probs[0].tolist()
-        return dict(zip(ACTIONS, probabilities))
+            probs = self._distribution(torch.tensor([position])).probs[0]
+            if self.config["evaluation_greedy"]:
+                return ACTIONS[probs.argmax().item()]
+            return ACTIONS[torch.multinomial(probs, 1, generator=self.generator).item()]
 
     def learn(self, observation, action, reward, next_observation, reached_goal):
-        # reward is deliberately unused: success is reported by the runtime only.
-        if self.pending is None or ACTIONS[self.pending["action"]] != action:
-            raise RuntimeError("learn()には直前に選択した行動を渡してください。")
-        self._initialize(next_observation)
-        self.trajectory.append({**self.pending, "achieved": list(next_observation["position"])})
+        if self.pending is None or ACTIONS[self.pending[1]] != action:
+            raise RuntimeError("Call learn() with the action just sampled by choose_action()")
+        achieved = self._state(next_observation)
+        self.rollout.append([*self.pending, achieved, self.episode_id])
         self.pending = None
-
-    def set_episode_limit(self, max_steps):
-        if type(max_steps) is not int or max_steps < 1:
-            raise ValueError("max_stepsは1以上の整数にしてください。")
-        self.settings["max_steps"] = max_steps
+        if len(self.rollout) == self.config["rollout_steps"]:
+            self._update()
+            self.rollout.clear()
 
     def end_episode(self):
         if self.pending is not None:
-            raise RuntimeError("learn()の後にend_episode()を呼んでください。")
-        if self.trajectory:
-            self.episodes.append(self.trajectory)
-            self.trajectory = []
-        if (len(self.episodes) >= 2
-                and sum(map(len, self.episodes)) >= self.config["rollout_steps"]):
-            self._update()
-            self.episodes.clear()
+            raise RuntimeError("Call learn() before end_episode()")
+        self.episode_id += 1
 
-    def _hindsight(self):
-        """Future achieved positions, never crossing terminal/time-limit boundaries."""
+    def _hindsight_indices(self, episode_ids, window_ends):
+        """Sample the reference distribution in linear space."""
         torch = self.torch
-        transitions, goals, episode_ids = [], [], []
-        for episode_id, episode in enumerate(self.episodes):
-            for time, transition in enumerate(episode):
-                weights = self.config["gamma"] ** torch.arange(len(episode) - time)
-                offset = int(torch.multinomial(weights, 1, generator=self.generator).item())
-                transitions.append(transition)
-                goals.append(episode[time + offset]["achieved"])
-                episode_ids.append(episode_id)
-        return transitions, torch.tensor(goals, dtype=torch.float32), torch.tensor(episode_ids)
+        rows = torch.arange(len(episode_ids))
+        terminal = window_ends.clone()
+        terminal[:-1] |= episode_ids[:-1] != episode_ids[1:]
+        ends = torch.where(terminal, rows, len(rows)).flip(0).cummin(0).values.flip(0)
+        future_count = ends - rows
 
-    def _all_q(self, states):
+        # Weight gamma**offset for strictly future rows, plus 1e-5 for self.
+        # Invert the CDF of the truncated geometric distribution.
+        gamma = self.config["gamma"]
+        log_gamma = math.log(gamma)
+        future_mass_factor = -torch.expm1(future_count * torch.tensor(log_gamma, dtype=torch.float64))
+        future_mass = future_mass_factor * (gamma / (1 - gamma))
+        draw = torch.rand(len(rows), dtype=torch.float64, generator=self.generator) * (future_mass + 1e-5)
+        future_draw = (draw - 1e-5).clamp_min(0) / future_mass.clamp_min(torch.finfo(torch.float64).tiny)
+        max_probability = 1 - torch.finfo(torch.float64).eps
+        offset = torch.log1p(-(future_draw * future_mass_factor).clamp_max(max_probability)) / log_gamma
+        offset = torch.where(draw < 1e-5, 0, offset.floor().long() + 1)
+        return rows + offset.minimum(future_count)
+
+    def _relabel(self, achieved, episode_ids):
+        """Drop each window's last row and reproduce time-major flattening."""
         torch = self.torch
-        count = len(states)
-        actions = torch.eye(4).repeat(count, 1)
-        embeddings = self.sa_encoder(torch.cat([states.repeat_interleave(4, 0), actions], -1))
-        target = self.goal_encoder(torch.tensor([self.map["goal"]], dtype=torch.float32))
-        return -torch.linalg.vector_norm(embeddings - target, dim=-1).reshape(count, 4)
+        rows = torch.arange(len(episode_ids))
+        length = self.config["rollout_length"]
+        ends = (rows + 1) % length == 0
+        ends[-1] = True
+        goals = self._hindsight_indices(episode_ids, ends)
+        retained = rows[~ends]
+        window_count = (len(rows) + length - 1) // length
+        order = (retained % length * window_count + retained // length).argsort()
+        retained = retained[order]
+        return retained, achieved[goals[retained]]
 
-    def _advantages(self, states, actions):
-        # Exact discrete baseline, no sampled approximation, GAE or reward.
-        with self.torch.no_grad():
+    def _sa_features(self, positions):
+        return self.torch.cat((self._features(positions, "sa_trunk"), positions.float()), dim=-1)
+
+    def _unit_embedding(self, embedding):
+        return embedding / (embedding.norm(dim=-1, keepdim=True) + 1e-6)
+
+    def _energy(self, sa, goal):
+        name = self.config["energy_fn"]
+        if name == "cosine":
+            sa, goal = self._unit_embedding(sa), self._unit_embedding(goal)
+        if name in ("dot", "cosine"):
+            return (sa * goal).sum(dim=-1)
+        squared_distance = (sa - goal).square().sum(dim=-1)
+        return self._distance_energy(squared_distance)
+
+    def _distance_energy(self, squared_distance):
+        if self.config["energy_fn"] == "norm":
+            return -(squared_distance + 1e-6).sqrt()
+        return -squared_distance
+
+    def _all_q(self, positions):
+        torch = self.torch
+        count = len(ACTIONS)
+        features = self._sa_features(positions)
+        encoded = self.networks["sa"](torch.cat((
+            features[:, None, :].expand(-1, count, -1), torch.eye(count).expand(len(positions), -1, -1)
+        ), dim=-1))
+        return self._energy(encoded, self.networks["goal"](self.target))
+
+    def _advantages(self, positions, actions):
+        torch = self.torch
+        with torch.no_grad():
             parts = []
-            # The paper collects 128 * 512 transitions per update. Evaluate in
-            # chunks so the four-action MLP activations do not scale with N.
-            for start in range(0, len(states), self.config["batch_size"]):
-                stop = start + self.config["batch_size"]
-                q = self._all_q(states[start:stop])
-                baseline = (self._distribution(states[start:stop]).probs * q).sum(-1)
-                parts.append(q.gather(1, actions[start:stop, None]).squeeze(1) - baseline)
-            return self.torch.cat(parts)
+            size = self.config["batch_size"]
+            for batch, taken in zip(positions.split(size), actions.split(size)):
+                q = self._all_q(batch)
+                baseline = (self._distribution(batch).probs * q).sum(dim=-1)
+                parts.append(q.gather(1, taken[:, None]).squeeze(1) - baseline)
+            advantages = torch.cat(parts)
+            # The reference normalizes once over the retained rollout,
+            # before shuffling, then freezes the result across all epochs.
+            if self.config["normalize_advantage"]:
+                advantages = (advantages - advantages.mean()) / (advantages.std(unbiased=False) + 1e-8)
+            return advantages
 
-    def _policy_snapshot(self, states):
+    def _contrastive_logits(self, sa, goal):
+        name = self.config["energy_fn"]
+        if name == "cosine":
+            sa, goal = self._unit_embedding(sa), self._unit_embedding(goal)
+        if name in ("dot", "cosine"):
+            return sa @ goal.T
+        # Direct cdist avoids cancellation from squared norms when pairs are
+        # very similar and avoids an explicit [batch, batch, repr] tensor.
+        distance = self.torch.cdist(sa, goal, compute_mode="donot_use_mm_for_euclid_dist")
+        return self._distance_energy(distance.square())
+
+    def _contrastive_loss(self, logits):
+        name = self.config["contrastive_loss_fn"]
+        positives = logits.diag()
+        if name == "binary_nce":
+            torch = self.torch
+            functional = torch.nn.functional
+            diagonal = torch.eye(len(logits), dtype=torch.bool, device=logits.device)
+            loss = functional.softplus(-positives).mean()
+            loss = loss + functional.softplus(logits).masked_fill(diagonal, 0).mean()
+        else:
+            loss = -positives.mean() * (2 if name == "sym_infonce" else 1)
+            if name in ("fwd_infonce", "sym_infonce"):
+                loss = loss + logits.logsumexp(dim=1).mean()
+            if name in ("bwd_infonce", "sym_infonce"):
+                loss = loss + logits.logsumexp(dim=0).mean()
+        coefficient = self.config["logsumexp_penalty_coef"]
+        if coefficient:
+            loss = loss + coefficient * (logits + 1e-6).logsumexp(dim=1).square().mean()
+        return loss
+
+    def _decayed_rate(self, start, schedule_steps):
+        decay = self.config["lr_decay_type"]
+        if decay == "none":
+            return start
+        progress = min(self.gradient_steps / schedule_steps, 1)
+        multiplier = 1 - progress if decay == "linear" else (1 + math.cos(math.pi * progress)) / 2
+        end = self.config["lr_end"]
+        return end + (start - end) * multiplier
+
+    def _contrastive_metrics(self, logits):
+        torch = self.torch
+        with torch.no_grad():
+            positives = logits.diag()
+            other_pairs = logits.numel() - len(positives)
+            negatives = (logits.sum() - positives.sum()) / max(1, other_pairs)
+            accuracy = (logits.argmax(dim=1) == torch.arange(len(positives))).float().mean()
+            return positives.mean(), negatives, accuracy, (logits + 1e-6).logsumexp(dim=1).mean()
+
+    def _policy_snapshot(self, positions):
         with self.torch.no_grad():
-            return self.torch.cat([self._distribution(part).probs
-                                   for part in states.split(self.config["batch_size"])])
+            return self.torch.cat([self._distribution(part).logits
+                                   for part in positions.split(self.config["batch_size"])])
 
     def _update(self):
         torch = self.torch
-        functional = torch.nn.functional
-        rows, goals, episode_ids = self._hindsight()
-        states = torch.tensor([row["state"] for row in rows], dtype=torch.float32)
-        actions = torch.tensor([row["action"] for row in rows])
-        old_logs = torch.tensor([row["log_prob"] for row in rows])
-        behavior_probs = self._policy_snapshot(states)
-        advantages = self._advantages(states, actions)
-        progress = min(self.updates / self.config["total_updates"], 1.)
-        lr = self.config["lr_end"] + .5 * (self.config["learning_rate"] - self.config["lr_end"]) * (1 + math.cos(math.pi * progress))
-        for group in self.optimizer.param_groups:
-            group["lr"] = lr
-        losses = []
+        positions, actions, old_logs, achieved, ids = map(torch.tensor, zip(*self.rollout))
+        indices, goals = self._relabel(achieved, ids)
+        # Small GridWorld runs may request fewer usable rows than a Navix batch.
+        size = min(len(indices), self.config["batch_size"])
+        count = len(indices) // size * size
+        indices, goals = indices[:count], goals[:count].float()
+        positions, actions, old_logs = positions[indices], actions[indices], old_logs[indices]
+        advantages = self._advantages(positions, actions)
+        behavior_logs = self._policy_snapshot(positions)
+        batches = count // size
+        schedule_steps = self.config["total_updates"] * self.config["epochs"] * batches
+        metric_names = ("contrastive_loss", "policy_loss", "entropy", "logits_pos", "logits_neg",
+                        "categorical_accuracy", "logsumexp")
+        batch_metrics = torch.zeros(len(metric_names))
+        clip = self.config["clip_coef"]
         for _ in range(self.config["epochs"]):
-            permutation = torch.randperm(len(rows), generator=self.generator)
-            for indices in permutation.split(self.config["batch_size"]):
-                # Bound the contrastive matrix by minibatch size. A homogeneous
-                # minibatch gets one additional negative from another episode.
-                candidates = indices
-                if len(episode_ids[indices].unique()) == 1:
-                    other = torch.nonzero(episode_ids != episode_ids[indices[0]]).flatten()
-                    pick = torch.randint(len(other), (1,), generator=self.generator)
-                    candidates = torch.cat([indices, other[pick]])
-                phi = self.sa_encoder(torch.cat([states[indices], functional.one_hot(actions[indices], 4).float()], -1))
-                psi = self.goal_encoder(goals[candidates])
-                logits = -torch.linalg.vector_norm(phi[:, None, :] - psi[None, :, :], dim=-1)
-                labels = torch.arange(len(indices))
-                allowed = episode_ids[indices, None] != episode_ids[candidates][None, :]
-                allowed[labels, labels] = True
-                contrastive = functional.cross_entropy(logits.masked_fill(~allowed, -torch.inf), labels)
-                distribution = self._distribution(states[indices])
-                ratio = (distribution.log_prob(actions[indices]) - old_logs[indices]).exp()
-                advantage = advantages[indices]
-                if self.config["normalize_advantage"] and len(indices) > 1:
-                    advantage = (advantage - advantage.mean()) / (advantage.std(unbiased=False) + 1e-8)
-                clipped = ratio.clamp(1 - self.config["clip_coef"], 1 + self.config["clip_coef"])
-                policy = -torch.minimum(ratio * advantage, clipped * advantage).mean()
-                entropy = distribution.entropy().mean()
-                loss = contrastive + policy - self.config["entropy_coef"] * entropy
-                self.optimizer.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.networks.parameters(), self.config["max_grad_norm"])
-                self.optimizer.step()
-                losses.append((float(contrastive.detach()), float(policy.detach()), float(entropy.detach())))
+            for batch in torch.randperm(count, generator=self.generator).split(size):
+                actor_lr = self._decayed_rate(self.config["learning_rate"], schedule_steps)
+                critic_lr = self._decayed_rate(self.config["critic_learning_rate"], schedule_steps)
+
+                policy = self._distribution(positions[batch])
+                ratio = (policy.log_prob(actions[batch]) - old_logs[batch]).exp()
+                advantage = advantages[batch]
+                actor_loss = -torch.minimum(ratio * advantage, ratio.clamp(1 - clip, 1 + clip) * advantage).mean()
+                entropy = policy.entropy().mean()
+
+                one_hot = torch.nn.functional.one_hot(actions[batch], len(ACTIONS)).float()
+                sa = self.networks["sa"](torch.cat((self._sa_features(positions[batch]), one_hot), dim=-1))
+                logits = self._contrastive_logits(sa, self.networks["goal"](goals[batch]))
+                critic_loss = self._contrastive_loss(logits)
+                actor_objective = actor_loss - self.config["entropy_coef"] * entropy
+                for optimizer, loss, lr in ((self.actor_optimizer, actor_objective, actor_lr),
+                                            (self.critic_optimizer, critic_loss, critic_lr)):
+                    group = optimizer.param_groups[0]
+                    group["lr"] = lr
+                    optimizer.zero_grad(set_to_none=True)
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(group["params"], self.config["max_grad_norm"])
+                    optimizer.step()
+                self.gradient_steps += 1
+                batch_metrics += torch.stack((critic_loss.detach(), actor_loss.detach(), entropy.detach(),
+                                              *self._contrastive_metrics(logits)))
         self.updates += 1
-        current_probs = self._policy_snapshot(states)
-        current_logs = current_probs.clamp_min(torch.finfo(current_probs.dtype).tiny).log()
-        behavior_logs = behavior_probs.clamp_min(torch.finfo(behavior_probs.dtype).tiny).log()
-        self.metrics = {"updates": self.updates, "rollout_steps": len(rows), "learning_rate": lr,
-                        "rollout_episodes": len(self.episodes),
-                        "unique_achieved_goals": len({tuple(row["achieved"]) for row in rows}),
-                        "target_seen_in_rollout": any(row["achieved"] == self.map["goal"] for row in rows),
-                        "policy_entropy": float(-(current_probs * current_logs).sum(-1).mean()),
-                        "behavior_entropy": float(-(behavior_probs * behavior_logs).sum(-1).mean()),
-                        "policy_kl": float((behavior_probs * (behavior_logs - current_logs)).sum(-1).mean()),
-                        "advantage_std": float(advantages.std(unbiased=False)),
-                        **{name: sum(row[i] for row in losses) / len(losses)
-                           for i, name in enumerate(("contrastive_loss", "policy_loss", "entropy"))}}
+        current_logs = self._policy_snapshot(positions)
+        self.metrics = {
+            "updates": self.updates, "rollout_steps": len(self.rollout), "learning_rate": actor_lr,
+            "critic_learning_rate": critic_lr,
+            "rollout_episodes": ids.unique().numel(), "training_samples": count,
+            "unique_achieved_goals": achieved.unique(dim=0).shape[0],
+            "target_seen_in_rollout": bool((achieved == self.target).all(dim=1).any()),
+            "policy_entropy": float(-(current_logs.exp() * current_logs).sum(dim=1).mean()),
+            "behavior_entropy": float(-(behavior_logs.exp() * behavior_logs).sum(dim=1).mean()),
+            "policy_kl": float((behavior_logs.exp() * (behavior_logs - current_logs)).sum(dim=1).mean()),
+            "advantage_std": float(advantages.std(unbiased=False)),
+            **dict(zip(metric_names, (batch_metrics / (self.config["epochs"] * batches)).tolist())),
+        }
 
     def _encode(self, value):
-        if isinstance(value, self.torch.Tensor):
-            stream = io.BytesIO()
-            self.torch.save(value.detach().cpu(), stream)
-            return {"tensor_data": base64.b64encode(stream.getvalue()).decode("ascii")}
-        if isinstance(value, dict):
-            return {key: self._encode(item) for key, item in value.items()}
-        if isinstance(value, (list, tuple)):
-            return [self._encode(item) for item in value]
-        return value
+        stream = io.BytesIO()
+        self.torch.save(value, stream)
+        return base64.b64encode(stream.getvalue()).decode("ascii")
 
     def _decode(self, value):
-        if isinstance(value, dict):
-            if set(value) == {"tensor_data"}:
-                return self.torch.load(io.BytesIO(base64.b64decode(value["tensor_data"])),
-                                       map_location="cpu", weights_only=True)
-            if set(value) == {"dtype", "values"}:
-                return self.torch.tensor(value["values"], dtype=getattr(self.torch, value["dtype"]))
-            return {key: self._decode(item) for key, item in value.items()}
-        if isinstance(value, list):
-            return [self._decode(item) for item in value]
-        return value
+        return self.torch.load(io.BytesIO(base64.b64decode(value)), map_location="cpu", weights_only=True)
 
     def export(self):
-        return {"algorithm": "cppo", "schema_version": 2, "settings": deepcopy(self.settings),
-                "seed": self.seed, "map": deepcopy(self.map), "updates": self.updates,
-                "metrics": deepcopy(self.metrics),
-                "networks": None if self.networks is None else self._encode(self.networks.state_dict())}
+        return {
+            "algorithm": "cppo", "schema_version": self.SCHEMA_VERSION,
+            "settings": deepcopy(self.settings), "seed": self.seed, "map": deepcopy(self.map),
+            "updates": self.updates, "gradient_steps": self.gradient_steps, "metrics": deepcopy(self.metrics),
+            "networks": None if self.networks is None else self._encode(self.networks.state_dict()),
+        }
 
     def checkpoint(self):
         if self.pending is not None:
-            raise RuntimeError("learn()の後で保存してください。")
-        return {"model": self.export(), "generator": self.generator.get_state().tolist(),
-                "optimizer": None if self.optimizer is None else self._encode(self.optimizer.state_dict()),
-                "episodes": deepcopy(self.episodes), "trajectory": deepcopy(self.trajectory)}
+            raise RuntimeError("Save the checkpoint after calling learn()")
+        return {
+            "model": self.export(), "generator": self.generator.get_state().tolist(),
+            "actor_optimizer": None if self.actor_optimizer is None else self._encode(self.actor_optimizer.state_dict()),
+            "critic_optimizer": None if self.critic_optimizer is None else self._encode(self.critic_optimizer.state_dict()),
+            "episode_id": self.episode_id, "rollout": deepcopy(self.rollout),
+        }
 
     def load_checkpoint(self, state):
         model = state["model"]
-        if model.get("algorithm") != "cppo" or model.get("schema_version") not in (1, 2):
-            raise ValueError("対応していないCPPOの保存形式です。")
+        if model.get("algorithm") != "cppo" or model.get("schema_version") != self.SCHEMA_VERSION:
+            raise ValueError("This CPPO checkpoint is incompatible with the Navix-style CNN and optimizers")
         restored = type(self)({**model["settings"], "seed": model["seed"]})
         if model["map"] is not None:
             restored._initialize(model["map"])
             restored.networks.load_state_dict(restored._decode(model["networks"]))
-            if state.get("optimizer") is not None:
-                optimizer = restored._decode(state["optimizer"])
-                optimizer["state"] = {int(key): value for key, value in optimizer["state"].items()}
-                restored.optimizer.load_state_dict(optimizer)
-        restored.generator.set_state(restored.torch.tensor(state["generator"], dtype=restored.torch.uint8))
+            restored.actor_optimizer.load_state_dict(restored._decode(state["actor_optimizer"]))
+            restored.critic_optimizer.load_state_dict(restored._decode(state["critic_optimizer"]))
+        restored.generator.set_state(self.torch.tensor(state["generator"], dtype=self.torch.uint8))
         restored.updates = model["updates"]
+        restored.gradient_steps = model["gradient_steps"]
         restored.metrics = deepcopy(model["metrics"])
-        restored.episodes = deepcopy(state["episodes"])
-        restored.trajectory = deepcopy(state["trajectory"])
+        restored.rollout = deepcopy(state["rollout"])
+        restored.episode_id = state["episode_id"]
         self.__dict__.update(restored.__dict__)
 
     def evaluation_copy(self):

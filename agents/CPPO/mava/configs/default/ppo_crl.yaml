@@ -1,0 +1,11 @@
+defaults:
+  - logger: logger
+  - arch: anakin
+  - system: icrl/ppo_crl
+  - network: ppo_crl
+  - env: smax # vector-connector  
+  - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs

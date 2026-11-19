@@ -1,0 +1,15 @@
+defaults:
+  - logger: logger
+  - arch: anakin
+  - env: navix
+  - system: icrl/ff_icrl_nx
+  - _self_
+
+hydra:
+  searchpath:
+    - file://mava/configs
+
+logger:
+  loggers:
+    json:
+      task_name: ${env.env_name}

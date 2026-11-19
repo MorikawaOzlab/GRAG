@@ -1,0 +1,57 @@
+# Logging options
+
+base_exp_path: results/
+
+loggers:
+  console:
+    _target_: mava.utils.logger.ConsoleLogger
+    enabled: True
+  neptune:
+    _target_: mava.utils.logger.NeptuneLogger
+    enabled: False
+    run_id: ~
+    project: cppo
+    tag: []
+    group_tag: []
+    detailed_logging: False  
+    architecture_name: ${arch.architecture_name}  
+    upload_json_data: False
+  json:
+    _target_: mava.utils.logger.JsonLogger
+    enabled: true
+    # If set, json files will be logged to a set path so that multiple experiments can
+    # write to the same json file for easy downstream aggregation and plotting with marl-eval.
+    path: ~
+    task_name: ${env.scenario.task_name}
+    env_name: ${env.env_name}
+    seed: ${system.seed}
+  tensorboard:
+    _target_: mava.utils.logger.TensorboardLogger
+    enabled: False
+
+# Checkpointing
+  wandb:
+    _target_: mava.utils.logger.WandbLogger
+    enabled: False
+    run_id: ~
+    project: cppo
+    entity: ~
+    tags: []
+    group: ~
+    run_name: ~
+    detailed_logging: False
+    upload_json_data: true # Whether to upload json data to WandB.
+
+checkpointing:
+  save_model: False # Whether to save model checkpoints.
+  save_args:
+    save_interval_steps: 1 # Number of steps between saving checkpoints.
+    max_to_keep: 1 # Maximum number of checkpoints to keep.
+    keep_period: ~ # Don't delete any checkpoint where step % keep_period == 0
+    checkpoint_uid: ~ # Unique identifier for checkpoint to save. Defaults to timestamp
+    rel_dir: checkpoints # Relative directory to save checkpoints.
+
+  load_model: False # Whether to load model checkpoints.
+  load_args:
+    checkpoint_uid: "" # Unique identifier for checkpoint to load.
+    rel_dir: checkpoints # Relative directory to load checkpoints.

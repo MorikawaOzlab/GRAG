@@ -1,0 +1,23 @@
+actor_network:
+  pre_torso:
+    _target_: mava.networks.torsos.MLPTorso
+    layer_sizes: [512, 512, 512, 512]  # 4 layers (same as original ICRL)
+    use_layer_norm: true
+    activation: swish  # Match original ICRL activation
+    activate_final: true
+
+sa_encoder_network:
+  pre_torso:
+    _target_: mava.networks.torsos.MLPTorso
+    layer_sizes: [512, 512, 512, 512]  # 4 layers
+    use_layer_norm: true
+    activation: swish
+    activate_final: true
+
+goal_encoder_network:
+  pre_torso:
+    _target_: mava.networks.torsos.MLPTorso
+    layer_sizes: [512, 512, 512, 512]  # 4 layers
+    use_layer_norm: true
+    activation: swish
+    activate_final: true

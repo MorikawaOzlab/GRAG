@@ -1,0 +1,14 @@
+learning_rate: 3e-4
+entropy_cost: 1e-2
+discounting: 0.97
+unroll_length: 128
+batch_size: 512
+num_minibatches: 1
+num_updates_per_batch: 8
+num_resets_per_eval: 1
+normalize_observations: true
+reward_scaling: 10.0
+clipping_epsilon: 0.3
+gae_lambda: 0.95
+deterministic_eval: false
+normalize_advantage: true

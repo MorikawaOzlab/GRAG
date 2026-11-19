@@ -3,6 +3,7 @@
 import base64
 import io
 import math
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -150,7 +151,8 @@ class SGCRLLearningTests(unittest.TestCase):
                 for net, previous in zip((agent.actor, agent.sa_encoder, agent.goal_encoder), before):
                     self.assertTrue(any(not torch.equal(p, old) for p, old in zip(net.parameters(), previous)))
                 self.assertTrue(all(p.grad is None for p in agent._encoder_parameters()))
-                self.assertLess(agent.log_alpha.item() * metrics["entropy"], 0)
+                self.assertEqual(metrics["alpha"], 0.0)
+                self.assertEqual(agent.log_alpha.item(), 0.0)
 
     def test_discrete_actor_matches_exact_expectation_and_only_trains_actor(self):
         agent = self.agent(crl_random_goals=0)
@@ -159,11 +161,28 @@ class SGCRLLearningTests(unittest.TestCase):
         with torch.no_grad():
             q = torch.stack([(agent.encode_state_actions(states, torch.full((2,), action))
                               * agent.encode_goals(goals)).sum(-1) for action in range(3)], -1)
-        expected = -(distribution.probs * q).sum(-1).mean() - distribution.entropy().mean()
+        expected = -(distribution.probs * q).sum(-1).mean()
         loss, _ = agent.actor_loss(states, goals)
         self.assertTrue(torch.allclose(loss, expected))
         loss.backward()
         self.assertTrue(all(p.grad is None for p in agent._encoder_parameters()))
+
+    def test_actor_gradient_uses_critic_before_its_update(self):
+        agent = self.agent(crl_random_goals=0)
+        self.episode(agent)
+        original = agent.encoder_optimizer.step
+        def critic_step(*args, **kwargs):
+            self.assertTrue(all(p.grad is not None for p in agent.actor.parameters()))
+            return original(*args, **kwargs)
+        with patch.object(agent.encoder_optimizer, "step", side_effect=critic_step):
+            agent.update()
+
+    def test_adaptive_entropy_is_available_only_when_requested(self):
+        agent = self.agent(crl_entropy_coefficient=None)
+        self.episode(agent)
+        metrics = agent.update()
+        self.assertLess(agent.log_alpha.item() * metrics["entropy"], 0)
+        self.assertGreater(metrics["alpha"], 0)
 
     def test_replay_capacity_and_idempotent_end_episode(self):
         agent = self.agent(crl_max_replay_size=5)
@@ -203,6 +222,37 @@ class SGCRLLearningTests(unittest.TestCase):
             self.assertTrue(0 <= action.item() < 3)
             with self.assertRaises(AssertionError):
                 agent.choose_action(torch.zeros(2), torch.ones(2), greedy=True)
+
+    def test_initial_random_action_depends_on_actor_weights_not_step_count(self):
+        agent = self.agent()
+        agent._steps = 1000
+        self.assertTrue(agent._uses_initial_random_policy())
+        with torch.no_grad():
+            agent.actor.network[0].bias[0] = 0.1
+        agent._updates += 1
+        self.assertFalse(agent._uses_initial_random_policy())
+        agent._steps = 0
+        self.assertFalse(agent._uses_initial_random_policy())
+
+    def test_async_learner_runs_during_collection_and_checkpoint_pauses(self):
+        agent = self.agent(crl_async_updates=True, crl_updates_per_step=1)
+        ran = threading.Event()
+        original = agent.update
+        def update():
+            result = original()
+            ran.set()
+            return result
+        with patch.object(agent, "update", side_effect=update):
+            agent.start_learning()
+            self.episode(agent)
+            self.assertTrue(ran.wait(10), "background learner did not run")
+            agent.learn(torch.zeros(2), torch.tensor(1), torch.ones(2), torch.ones(2))
+            saved = agent.checkpoint()
+            self.assertFalse(agent._learning_enabled)
+            restored = SGCRL.from_export(saved)
+            self.assertEqual(restored._steps, agent._steps)
+            self.assertEqual(restored._update_credit, agent._update_credit)
+            self.assertEqual(len(restored._episode), 1)
 
     def test_shared_actor_features_match_full_action_computation_and_gradients(self):
         agent = self.agent(crl_hidden_size=32)

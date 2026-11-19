@@ -151,7 +151,7 @@ PPO本体の `checkpoint()` は、環境に依存しない `agents/ppo_checkpoin
 
 `execution="batch"` は指定回数の学習と学習後の方策評価を行う従来APIです。
 `POST /api/train/evaluate` と `TrainingSession.evaluate()` も維持しています。
-評価は学習器のコピーで `greedy=True` の行動を選び、元のモデル・乱数・集計を変えません。
+評価は学習器のコピーで行い、元のモデル・乱数・集計を変えません。通常は `greedy=True` で行動を選びます。CPPOは既定で方策の確率に従って行動を抽出します。
 これらの明示的な評価だけが、1回の評価走行の `frames` を生成します。
 ライブ画面の観察・高速学習は評価やフレーム生成を呼びません。
 

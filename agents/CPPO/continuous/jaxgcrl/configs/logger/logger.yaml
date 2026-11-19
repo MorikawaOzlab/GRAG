@@ -1,0 +1,68 @@
+base_exp_path: results/
+
+loggers:
+  console:
+    enabled: True
+
+  wandb:
+    enabled: ${run.log_wandb}
+    project: ${run.wandb_project_name}
+    entity: ~
+    group: ${run.wandb_group}
+    run_name: ${run.exp_name}
+    tags: []
+    detailed_logging: False
+    run_id: ~
+    upload_json_data: true
+
+  neptune:
+    enabled: False
+    project: ~
+    tag: []
+    group_tag: []
+    detailed_logging: False
+    architecture_name: jaxgcrl_anakin
+    upload_json_data: False
+    run_id: ~
+
+  json:
+    # marl-eval-compatible JSON writer.
+    # Path defaults to `results/json/<env_name>/` (one file per env, all seeds
+    # and algos share it because the file structure nests by env→task→algo→seed).
+    enabled: True
+    path: ~
+    task_name: ${env.env_name}
+    env_name: ${env.env_name}
+    # Map JaxGCRL metric keys → marl-eval-compatible keys. The keys on the
+    # left are what the agent emits (after stripping the `eval/` prefix);
+    # the values on the right are what gets written to metrics.json.
+    #
+    # `episode_success_any` is the JaxGCRL-paper success metric (0–1 fraction
+    # of episodes where the goal was reached at any step). It's the headline
+    # number from Figure 3 of Bortkiewicz et al.; we expose it as `success_rate`.
+    # Note: SMAX `win_rate` is 0–100 (percent); ours is 0–1 (fraction). Don't
+    # mix scales when plotting across projects.
+    metrics_to_log:
+      episode_success_any: success_rate
+      episode_reward: mean_episode_return
+      sps: steps_per_second
+      avg_episode_length: mean_episode_length
+
+  tensorboard:
+    enabled: False
+
+# Mava's checkpointing block — disabled by default. The JaxGCRL agents don't
+# use Orbax; if you need checkpoints, the original `brax.io.model.save_params`
+# path is still callable from `train_fn`.
+checkpointing:
+  save_model: False
+  save_args:
+    save_interval_steps: 1
+    max_to_keep: 1
+    keep_period: ~
+    checkpoint_uid: ~
+    rel_dir: checkpoints
+  load_model: False
+  load_args:
+    checkpoint_uid: ""
+    rel_dir: checkpoints

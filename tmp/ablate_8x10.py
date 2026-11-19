@@ -1,8 +1,11 @@
 """Diagnose 8x10 GRAG with temporary, in-process ablations."""
 import json
+import inspect
 import sys
+import textwrap
 from collections import Counter, deque
 from pathlib import Path
+from types import MethodType
 
 import torch
 from agents.grag_impl.grag import GRAG
@@ -12,7 +15,8 @@ torch.set_num_threads(1)
 source = Path('GridWorld/data/training_sessions/b1c1bd0d60c6437b8496dc727af8d7d2.json')
 world = GridWorld(json.loads(source.read_text(encoding='utf8'))['map'])
 seed, mode = int(sys.argv[1]), sys.argv[2]
-agent = GRAG({'seed': seed, 'hindsight_gamma': .99, 'grag_update_interval': 1280})
+agent = GRAG({'seed': seed, 'hindsight_gamma': .99,
+              'grag_update_interval': 128 if mode == 'interval_128' else 1280})
 agent.initialize_for_gridworld(world.map)
 goal = tuple(world.map['goal'])
 dist = {goal: 0}
@@ -49,6 +53,19 @@ agent._sample_hindsight_goals = tracked_hindsight
 
 if mode == 'freeze_actor':
     agent._update_ppo = lambda rows: None
+elif mode == 'mask_same_goal':
+    source_code = textwrap.dedent(inspect.getsource(GRAG._update_contrastive))
+    mask = 'allowed = episode_ids[:, None] != episode_ids[None, :]'
+    assert mask in source_code
+    namespace = {'torch': torch, 'nn': torch.nn, 'F': torch.nn.functional}
+    exec(source_code.replace(mask, mask + '\n    allowed &= ~(goals[:, None, :] == goals[None, :, :]).all(dim=-1)'), namespace)
+    agent._update_contrastive = MethodType(namespace['_update_contrastive'], agent)
+elif mode == 'one_epoch':
+    source_code = textwrap.dedent(inspect.getsource(GRAG._update_ppo))
+    assert 'for _ in range(4):' in source_code
+    namespace = {'torch': torch, 'nn': torch.nn}
+    exec(source_code.replace('for _ in range(4):', 'for _ in range(1):'), namespace)
+    agent._update_ppo = MethodType(namespace['_update_ppo'], agent)
 elif mode == 'oracle_q':
     def oracle_ppo(rows):
         def oracle(states, goals):

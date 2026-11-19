@@ -1,0 +1,36 @@
+
+# Enable ICRL
+use_icrl: true
+
+# Seed
+total_timesteps: ~ # Set the total environment steps.
+num_updates: 1250 # Number of updates
+seed: 42
+# Training steps
+update_batch_size: 1
+add_agent_id: False
+
+# Environment steps
+rollout_length: 128
+batch_size: 256
+ppo_epochs: 1 # Number of ppo epochs per training data batch.
+clip_eps: 0.2 # Clipping value for PPO updates and value function.
+ent_coef: 0.1 # Entropy regularisation term for loss function.
+q_lr: 2.5e-4
+actor_lr: 2.5e-4 # Learning rate for actor network
+
+max_grad_norm: 0.5
+lr_decay_type: "cosine"
+
+lr_end: 1e-7
+gamma: 0.99
+logsumexp_penalty_coeff: 0.1  #
+rep_size: 64
+energy_fn: "norm"
+contrastive_loss_fn: "fwd_infonce"
+win_repeat_steps: 5 
+
+
+# Goal configuration
+icrl:
+  goal_type: "distance_per_agent" 

@@ -246,6 +246,8 @@ class GRAG:
         self._update_batch.append(transition)
 
         self.pending = None
+
+        # データがたまったら重みを更新
         if len(self._update_batch) == self.UPDATE_INTERVAL:
             self._update_networks(self._update_batch)
             self._update_batch = []
@@ -259,10 +261,16 @@ class GRAG:
             self.trajectory = []
             self._episode_id += 1
 
+
+    #===============
+    # 学習用メソッド
+    #===============
+
     def _update_networks(self, transitions: list) -> None:
         """収集した経験を対照学習とPPOの更新に渡す。"""
-        if self._update_contrastive(transitions):
-            self._update_ppo(transitions)
+        # CPPOと同様、更新前のCriticでadvantageを計算してActor更新中は固定する。
+        self._update_ppo(transitions)
+        self._update_contrastive(transitions)
 
     def _sample_hindsight_goals(self, transitions: list) -> torch.Tensor:
         """各遷移から、同一エピソード内の将来の到達ゴールを選択する。"""
@@ -331,9 +339,11 @@ class GRAG:
             return False
 
         # 2. 学習データの準備
-        reference = next(self.sa_encoder.parameters())
+        reference = next(self.sa_encoder.parameters()) # エンコーダの１番目の学習対象パラメータ
         device = reference.device
 
+        # バッチからデータを取り出す．各エピソードを1次元で管理する
+        # エンコーダのパラメータと同じデータ型，デバイスにそろえる
         states = torch.stack([
             t["state"].reshape(-1) for t in batch
         ]).to(reference)
@@ -342,10 +352,12 @@ class GRAG:
             [t["action"] for t in batch],
             device=device,
         )
+
         actions = F.one_hot(
             actions, num_classes=len(self.actions)
         ).to(reference)
 
+        # HERを適用
         goals = self._sample_hindsight_goals(batch).to(reference)
 
         # 3. エンコード
@@ -355,17 +367,17 @@ class GRAG:
         goal_repr = self.goal_encoder(goals)
 
         # 4. InfoNCE損失の計算
-        logits = -torch.cdist(sa_repr, goal_repr)
+        logits = -torch.cdist(sa_repr, goal_repr) # ユークリッド距離を計算
 
         episode_ids = episode_ids.to(device)
         labels = torch.arange(len(batch), device=device)
 
-        # 同一エピソード内の他の経験を負例から除外
+        # 正例を用意 : 同一エピソード内の他の経験を負例から除外
         allowed = episode_ids[:, None] != episode_ids[None, :]
         allowed[labels, labels] = True
 
         logits = logits.masked_fill(~allowed, -torch.inf)
-        loss = F.cross_entropy(logits, labels)
+        loss = F.cross_entropy(logits, labels) # InfoNCE Loss
 
         # 5. パラメータ更新
         self.contrastive_optimizer.zero_grad()

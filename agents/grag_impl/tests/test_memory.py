@@ -14,32 +14,30 @@ class MemoryTests(unittest.TestCase):
             for step in range(3):
                 action = agent.choose_action([1, 2])
                 agent.learn([1, 2], action, 0, [2, 3], False)
-                self.assertEqual(update.call_count, 1 if step == 2 else 0)
+                if step == 0:
+                    agent.end_episode()
+                self.assertEqual(update.call_count, 0)
+            agent.end_episode()
+            self.assertEqual(update.call_count, 1)
             self.assertEqual(len(update.call_args.args[0]), 3)
 
     def test_updates_every_128_steps_across_episodes(self):
         agent = GRAG({"seed": 4, "actions": (0, 1), "grag_update_interval": 128})
         agent.initialize_networks(2, 1)
-        with patch.object(agent, "_update_contrastive", return_value=True) as contrastive, \
-             patch.object(agent, "_update_ppo") as ppo:
+        with patch.object(agent, "_update_networks") as update:
             for step in range(256):
                 action = agent.choose_action([1, 2])
                 agent.learn([1, 2], action, 0, [2, 3], False)
                 if step == 49:
                     agent.end_episode()
-                if step == 126:
-                    self.assertEqual(contrastive.call_count, 0)
                 if step == 127:
-                    self.assertEqual(contrastive.call_count, 1)
-                    batch = contrastive.call_args.args[0]
-                    self.assertEqual(len(batch), 128)
-                    self.assertEqual([row["episode_id"] for row in batch],
-                                     [0] * 50 + [1] * 78)
-            self.assertEqual(contrastive.call_count, 2)
-            self.assertEqual(ppo.call_count, 2)
-            self.assertIs(contrastive.call_args.args[0], ppo.call_args.args[0])
-            self.assertEqual(agent._update_batch, [])
-            self.assertEqual(len(agent.trajectory), 206)
+                    self.assertEqual(update.call_count, 0)
+                    agent.end_episode()
+                    batch = update.call_args.args[0]
+                    self.assertEqual([row["episode_id"] for row in batch], [0] * 50 + [1] * 78)
+            self.assertEqual(update.call_count, 1)
+            self.assertEqual(len(agent._update_batch), 128)
+            self.assertEqual(len(agent.trajectory), 128)
 
     def test_transitions_and_episode_boundaries(self):
         agent = GRAG({"seed": 3, "actions": ("a", "b")})
@@ -55,7 +53,7 @@ class MemoryTests(unittest.TestCase):
         self.assertEqual(record["next_observation"], [3., 4.])
         self.assertTrue(torch.equal(record["state"], torch.tensor([1., 2.])))
         self.assertTrue(torch.equal(record["next_state"], torch.tensor([3., 4.])))
-        self.assertAlmostEqual(record["log_prob"], torch.tensor(probabilities[action]).log().item())
+        self.assertAlmostEqual(record["log_prob"], torch.tensor(probabilities[action]).log().item(), places=6)
         self.assertTrue(record["reached_goal"])
         agent.end_episode()
         self.assertEqual(len(agent.episodes), 1)

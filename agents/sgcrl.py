@@ -5,6 +5,7 @@ from collections import deque
 import io
 import math
 import random
+import threading
 from time import perf_counter
 
 import torch
@@ -25,6 +26,7 @@ class _Policy(nn.Module):
         if self.discrete:
             return torch.distributions.Categorical(logits=output, validate_args=False if self.graph_capture else None)
         mean, raw_scale = output.chunk(2, dim=-1)
+        mean = 10 * torch.tanh(mean / 10)
         scale = nn.functional.softplus(raw_scale) + 1e-6
         base = torch.distributions.Independent(
             torch.distributions.Normal(mean, scale), 1)
@@ -62,8 +64,22 @@ class SGCRL:
         self.min_replay_size = settings.get("crl_min_replay_size", 10_000)
         self.max_replay_size = settings.get("crl_max_replay_size", 1_000_000)
         self.updates_per_step = float(settings.get("crl_updates_per_step", 1.0))
+        self.async_updates = settings.get("crl_async_updates", False)
+        if type(self.async_updates) is not bool:
+            raise ValueError("crl_async_updatesはboolにしてください。")
+        self._learning_lock = threading.RLock()
+        self._learning_condition = threading.Condition(self._learning_lock)
+        self._learning_enabled = False
+        self._learning_thread = None
+        self._learning_error = None
+        self._update_credit = 0.0
         self.learning_rate = float(settings.get("crl_learning_rate", 3e-4))
         self.target_entropy = float(settings.get("crl_target_entropy", 0.0))
+        self.entropy_coefficient = settings.get("crl_entropy_coefficient", 0.0)
+        if self.entropy_coefficient is not None:
+            self.entropy_coefficient = float(self.entropy_coefficient)
+            if not math.isfinite(self.entropy_coefficient) or self.entropy_coefficient < 0:
+                raise ValueError("crl_entropy_coefficientは非負の有限数またはNoneにしてください。")
         self.random_goals = float(settings.get("crl_random_goals", 0.5))
         self.share_actor_features = settings.get("crl_share_actor_features", True)
         if type(self.share_actor_features) is not bool:
@@ -90,6 +106,8 @@ class SGCRL:
         self._replay_size = 0
         self._steps = 0
         self._updates = 0
+        self._initial_policy_checked_at = -1
+        self._initial_policy = True
         self.metrics = {}
         self._update_progress = {"phase": "collecting", "completed": 0, "total": 0}
         self._update_rate = 0.0
@@ -116,7 +134,7 @@ class SGCRL:
         各ネットワークは末尾を特徴次元とし、任意のバッチ次元を保持する。
         観測の抽出・平坦化・画像特徴抽出などは環境側で行う。
         Criticは未正規化の内積phi(s,a)^T psi(g)であり、独立したV網は作らない。
-        Adamと適応エントロピー係数も初期化する。外部のPyTorch乱数状態は保持する。
+        Adamとエントロピー係数も初期化する。外部のPyTorch乱数状態は保持する。
         """
         if any(type(size) is not int or size < 1
                for size in (state_dim, goal_dim, action_dim)):
@@ -178,6 +196,14 @@ class SGCRL:
             action = transform(action)
         return action if reparameterize else action.detach()
 
+    def _uses_initial_random_policy(self):
+        """著者実装と同様、最初のActor層のバイアスで初期方策を判定する。"""
+        if self._initial_policy_checked_at != self._updates:
+            bias = self.actor.network[0].bias
+            self._initial_policy = bool(torch.count_nonzero(bias.detach()).item() == 0)
+            self._initial_policy_checked_at = self._updates
+        return self._initial_policy
+
     def choose_action(
         self, state: torch.Tensor, goal: torch.Tensor, greedy: bool = False,
     ) -> torch.Tensor:
@@ -193,7 +219,7 @@ class SGCRL:
             raise RuntimeError("initialize_networks()でネットワークを初期化してください。")
         reference = next(self.actor.parameters())
         with torch.no_grad():
-            if not greedy and self._steps < self.min_replay_size:
+            if not greedy and self._uses_initial_random_policy():
                 # 初期ランダム収集で使わないActor推論や特徴のGPU転送を省く。
                 if self.actor.discrete:
                     return torch.randint(self._network_spec[2], state.shape[:-1],
@@ -256,6 +282,10 @@ class SGCRL:
 
     def end_episode(self) -> None:
         """成功・失敗とも保存し、収集遷移数に比例した回数だけ学習する。二重呼出しは無操作。"""
+        if self.async_updates:
+            with self._learning_condition:
+                self._finish_episode_async()
+            return
         if not self._episode:
             return
         collected = len(self._episode)
@@ -291,6 +321,64 @@ class SGCRL:
             if updates:
                 self._update_rate = self._update_progress["completed"] / max(elapsed, 1e-9)
             self._update_progress = {**self._update_progress, "phase": "collecting"}
+
+    def _finish_episode_async(self):
+        if not self._episode:
+            return
+        collected = len(self._episode)
+        episode = tuple(torch.stack(items) for items in zip(*self._episode[-self.max_replay_size:]))
+        self._episode.clear()
+        self._episodes.append(episode)
+        self._replay_size += len(episode[0])
+        while self._replay_size > self.max_replay_size:
+            old = self._episodes.popleft()
+            self._replay_size -= len(old[0])
+        self._cuda_graph = None
+        self._graph_inline_sampling = False
+        self._replay_cache_key = self._replay_cache = None
+        self._update_credit += collected * self.updates_per_step
+        self._learning_condition.notify_all()
+
+    def start_learning(self):
+        if not self.async_updates:
+            return
+        with self._learning_condition:
+            if self._learning_error is not None:
+                raise RuntimeError("SGCRLの学習器が停止しました") from self._learning_error
+            self._learning_enabled = True
+            if self._learning_thread is None or not self._learning_thread.is_alive():
+                self._learning_thread = threading.Thread(target=self._learning_loop, daemon=True, name="sgcrl-learner")
+                self._learning_thread.start()
+            self._learning_condition.notify_all()
+
+    def pause_learning(self):
+        if self.async_updates:
+            with self._learning_condition:
+                self._learning_enabled = False
+                if self._learning_error is not None:
+                    raise RuntimeError("SGCRL???????????") from self._learning_error
+
+    def _learning_loop(self):
+        while True:
+            with self._learning_condition:
+                if not self._learning_enabled:
+                    self._learning_thread = None
+                    return
+                if self._replay_size < self.min_replay_size or self._update_credit < 1:
+                    self._learning_condition.wait(timeout=0.1)
+                    continue
+                try:
+                    start = perf_counter()
+                    self._update_progress = {"phase": "updating", "completed": self._updates,
+                                             "total": self._updates + int(self._update_credit)}
+                    self.update()
+                    self._update_credit -= 1
+                    self._update_rate = 1 / max(perf_counter() - start, 1e-9)
+                except Exception as error:
+                    self._learning_error = error
+                    self._learning_enabled = False
+                    self._learning_thread = None
+                    return
 
     def runtime_status(self):
         return {**self._update_progress, "device": str(self.device), "updates": self._updates,
@@ -367,6 +455,11 @@ class SGCRL:
     def _encoder_parameters(self):
         return list(self.sa_encoder.parameters()) + list(self.goal_encoder.parameters())
 
+    def _alpha_value(self):
+        if self.entropy_coefficient is None:
+            return self.log_alpha.detach().exp()
+        return self.log_alpha.detach().new_full((), self.entropy_coefficient)
+
     def encode_state_actions(self, states, actions):
         if self.actor.discrete:
             actions = nn.functional.one_hot(actions.long(), self._network_spec[2]).to(states)
@@ -400,7 +493,8 @@ class SGCRL:
         elif self.random_goals == 1.0:
             goals = goals.roll(1, 0)
         distribution = self.actor(torch.cat((states, goals), -1))
-        alpha = self.log_alpha.exp().detach()
+        alpha = (self.log_alpha.exp().detach() if self.entropy_coefficient is None
+                 else self.entropy_coefficient)
         if self.actor.discrete:
             with torch.no_grad():
                 if self.random_goals == 0.5 and self._can_share_actor_features():
@@ -459,21 +553,21 @@ class SGCRL:
         try:
             with torch.cuda.graph(graph):
                 states, actions, goals = self.sample_batch() if inline_sampling else self._graph_batch
+                actor_loss, entropy = self.actor_loss(states, goals)
+                self.actor_optimizer.zero_grad(set_to_none=False)
+                actor_loss.backward()
                 critic_loss = self.critic_loss(states, actions, goals)
                 self.encoder_optimizer.zero_grad(set_to_none=False)
                 critic_loss.backward()
                 self.encoder_optimizer.step()
-                self.encoder_optimizer.zero_grad(set_to_none=False)
-                actor_loss, entropy = self.actor_loss(states, goals)
-                self.actor_optimizer.zero_grad(set_to_none=False)
-                actor_loss.backward()
                 self.actor_optimizer.step()
-                alpha_loss = self.log_alpha.exp() * (entropy.detach() - self.target_entropy)
-                self.alpha_optimizer.zero_grad(set_to_none=False)
-                alpha_loss.backward()
-                self.alpha_optimizer.step()
+                if self.entropy_coefficient is None:
+                    alpha_loss = self.log_alpha.exp() * (entropy.detach() - self.target_entropy)
+                    self.alpha_optimizer.zero_grad(set_to_none=False)
+                    alpha_loss.backward()
+                    self.alpha_optimizer.step()
                 self._graph_metrics = torch.stack((critic_loss.detach(), actor_loss.detach(),
-                                                   entropy.detach(), self.log_alpha.detach().exp()))
+                                                   entropy.detach(), self._alpha_value()))
         finally:
             self.actor.graph_capture = False
         self._cuda_graph = graph
@@ -482,7 +576,7 @@ class SGCRL:
     def update(self):
         # Graph mode is limited to the built-in discrete implementation; extensions
         # and continuous policies keep their existing execution and RNG semantics.
-        eligible = (self.device.type == "cuda" and self.actor.discrete
+        eligible = (not self.async_updates and self.device.type == "cuda" and self.actor.discrete
                     and type(self) is SGCRL and self.settings.get("crl_cuda_graph", True)
                     and self._updates >= 3 and not self._cuda_graph_disabled)
         generator_before = (self._replay_generator.get_state() if eligible and self._cuda_graph is None else None)
@@ -514,6 +608,11 @@ class SGCRL:
                 self.metrics["replay_size"] = self._replay_size
                 return self.metrics
         states, actions, goals = batch
+        actor_loss, entropy = self.actor_loss(states, goals)
+        if not torch.isfinite(actor_loss):
+            raise FloatingPointError("Actor損失が有限ではありません。")
+        self.actor_optimizer.zero_grad(set_to_none=True)
+        actor_loss.backward()
         critic_loss = self.critic_loss(states, actions, goals)
         self.encoder_optimizer.zero_grad(set_to_none=True)
         if not torch.isfinite(critic_loss):
@@ -521,20 +620,16 @@ class SGCRL:
         critic_loss.backward()
         self.encoder_optimizer.step()
         self.encoder_optimizer.zero_grad(set_to_none=True)
-        actor_loss, entropy = self.actor_loss(states, goals)
-        if not torch.isfinite(actor_loss):
-            raise FloatingPointError("Actor損失が有限ではありません。")
-        self.actor_optimizer.zero_grad(set_to_none=True)
-        actor_loss.backward()
         self.actor_optimizer.step()
-        alpha_loss = self.log_alpha.exp() * (entropy.detach() - self.target_entropy)
-        self.alpha_optimizer.zero_grad(set_to_none=True)
-        alpha_loss.backward()
-        self.alpha_optimizer.step()
+        if self.entropy_coefficient is None:
+            alpha_loss = self.log_alpha.exp() * (entropy.detach() - self.target_entropy)
+            self.alpha_optimizer.zero_grad(set_to_none=True)
+            alpha_loss.backward()
+            self.alpha_optimizer.step()
         self._updates += 1
         # GPUの小さな値を4回同期転送せず、一度に取得する。
         values = torch.stack((critic_loss.detach(), actor_loss.detach(), entropy.detach(),
-                              self.log_alpha.detach().exp())).tolist()
+                              self._alpha_value())).tolist()
         self.metrics = dict(zip(("critic_loss", "actor_loss", "entropy", "alpha"), values))
         self.metrics["replay_size"] = self._replay_size
         return self.metrics
@@ -544,14 +639,19 @@ class SGCRL:
 
         保存する学習データがなければ空の辞書を返す。
         """
-        return self._serialize(include_replay=False)
+        self.pause_learning()
+        with self._learning_lock:
+            return self._serialize(include_replay=False)
 
     def checkpoint(self):
-        return self._serialize(include_replay=True)
+        self.pause_learning()
+        with self._learning_lock:
+            return self._serialize(include_replay=True)
 
     def _serialize(self, *, include_replay):
         payload = {"settings": self.settings, "spec": self._network_spec,
                    "steps": self._steps, "updates": self._updates, "metrics": self.metrics,
+                   "update_credit": self._update_credit,
                    "seed": self.seed, "random": self._random.getstate(),
                    "action_random": self._action_generator.get_state(),
                    "action_random_device": self._action_generator.device.type,
@@ -575,6 +675,7 @@ class SGCRL:
         return agent
 
     def load_checkpoint(self, value):
+        self.pause_learning()
         if value.get("format") != "sgcrl-v1":
             raise ValueError("SGCRLチェックポイント形式が異なります。")
         payload = torch.load(io.BytesIO(base64.b64decode(value["data"])),
@@ -598,6 +699,7 @@ class SGCRL:
             with torch.no_grad():
                 self.log_alpha.copy_(payload["log_alpha"])
         self._steps, self._updates = payload["steps"], payload["updates"]
+        self._update_credit = payload.get("update_credit", 0.0)
         self.metrics = payload["metrics"]
         self._random.setstate(payload["random"])
         source_device = payload.get("action_random_device")
@@ -635,7 +737,7 @@ class GridWorldSGCRL:
     ACTIONS = ("up", "down", "left", "right")
 
     def __init__(self, settings):
-        self.core = SGCRL(settings)
+        self.core = SGCRL({"crl_async_updates": True, **settings})
         self._map_spec = None
         self._feature_vectors = {}
         self._obstacle_features = None
@@ -684,12 +786,15 @@ class GridWorldSGCRL:
 
     def choose_action(self, observation, greedy=False):
         state, goal = self._features(observation)
-        if not greedy and self.core._steps < self.core.min_replay_size:
-            action = torch.randint(len(self.ACTIONS), (), generator=self._grid_action_generator).item()
-        else:
-            probabilities = self._cached_probabilities(observation, state, goal)
-            action = (probabilities.argmax().item() if greedy else
-                      torch.multinomial(probabilities, 1, generator=self._grid_action_generator).item())
+        if not greedy:
+            self.core.start_learning()
+        with self.core._learning_lock:
+            if not greedy and self.core._uses_initial_random_policy():
+                action = torch.randint(len(self.ACTIONS), (), generator=self._grid_action_generator).item()
+            else:
+                probabilities = self._cached_probabilities(observation, state, goal)
+                action = (probabilities.argmax().item() if greedy else
+                          torch.multinomial(probabilities, 1, generator=self._grid_action_generator).item())
         return self.ACTIONS[action]
 
     def _cached_probabilities(self, observation, state, goal):
@@ -703,7 +808,8 @@ class GridWorldSGCRL:
 
     def action_probabilities(self, observation):
         state, goal = self._features(observation, initialize=False)
-        probabilities = self._cached_probabilities(observation, state, goal).tolist()
+        with self.core._learning_lock:
+            probabilities = self._cached_probabilities(observation, state, goal).tolist()
         return dict(zip(self.ACTIONS, probabilities))
 
     def learn(self, observation, action, reward, next_observation, reached_goal):
@@ -717,6 +823,9 @@ class GridWorldSGCRL:
 
     def runtime_status(self):
         return self.core.runtime_status()
+
+    def pause_learning(self):
+        self.core.pause_learning()
 
     def export(self):
         return {"format": "gridworld-sgcrl-v1", "map_spec": self._map_spec,

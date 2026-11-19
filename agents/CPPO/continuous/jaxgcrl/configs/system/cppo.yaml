@@ -1,0 +1,37 @@
+# Optimization
+actor_lr: 3e-4
+q_lr: 3e-4
+max_grad_norm: 1.0
+lr_linear_decay: false
+lr_end: 1e-7
+
+# Rollout 
+unroll_length: 128
+num_epochs: 8
+batch_size: 256
+
+# PPO
+discounting: 0.9999
+clip_eps: 0.2
+ent_coef: 1e-4
+
+# MC V(s,g) 
+num_mc_samples: 32
+
+# Contrastive critic
+logsumexp_penalty_coeff: 0.1
+repr_dim: 64
+contrastive_loss_fn: fwd_infonce
+energy_fn: norm
+
+# Network 
+h_dim: 512
+n_hidden: 4
+use_layer_norm: true
+use_relu: false
+skip_connections: 4
+log_std_min: -5.0
+log_std_max: 2.0
+
+# Goal handling
+terminate_on_success: true

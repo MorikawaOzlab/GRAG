@@ -1,0 +1,15 @@
+defaults:
+  - logger: logger
+  - arch: anakin
+  - system: icrl/ff_icrl_jaxnav
+  - network: ppo_crl
+  - env: jaxnav
+  - _self_
+
+env:
+  goal_type: distance
+  eval_metric: success
+
+hydra:
+  searchpath:
+    - file://mava/configs

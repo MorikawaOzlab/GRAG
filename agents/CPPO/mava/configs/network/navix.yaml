@@ -1,0 +1,15 @@
+sa_encoder_network:
+  torso:
+    _target_: mava.networks.torsos.MLPTorso
+    layer_sizes: [1024, 1024, 1024, 1024]
+    activation: swish
+    use_layer_norm: true
+    use_layer_norm_scale: true
+
+goal_encoder_network:
+  torso:
+    _target_: mava.networks.torsos.MLPTorso
+    layer_sizes: [1024, 1024, 1024, 1024]
+    activation: swish
+    use_layer_norm: true
+    use_layer_norm_scale: true

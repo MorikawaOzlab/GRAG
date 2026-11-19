@@ -1,0 +1,13 @@
+# Anakin config
+architecture_name: anakin
+
+# Training
+num_envs: 512  # Number of vectorised environments per device.
+
+# Evaluation
+evaluation_greedy: false 
+num_evaluation: 80 # Number of evenly spaced evaluations to perform during training.
+num_eval_episodes: 2048 # Number of episodes to evaluate per evaluation.
+num_absolute_metric_eval_episodes: 8192  # Number of episodes to evaluate the absolute metric (the final evaluation).
+absolute_metric: false # Whether the absolute metric should be computed. For more details
+# on the absolute metric please see: https://arxiv.org/abs/2209.10485
