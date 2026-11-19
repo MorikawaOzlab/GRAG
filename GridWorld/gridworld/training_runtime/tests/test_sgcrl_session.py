@@ -5,7 +5,7 @@ import unittest
 
 import torch
 
-from agents.grag_impl.grag_sgcrl import GridWorldSGCRL
+from agents.sgcrl import GridWorldSGCRL
 from gridworld.storage import DEFAULT_SETTINGS
 from gridworld.training_runtime import TrainingSession
 

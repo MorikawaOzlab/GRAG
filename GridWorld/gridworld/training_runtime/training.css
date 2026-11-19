@@ -39,3 +39,8 @@
 
 
 .value-card{margin-top:22px;width:calc((100% - 22px)/2);box-sizing:border-box}#value-dialog{border:1px solid #cbdce7;border-radius:12px;padding:24px;color:#233b48}#value-dialog::backdrop{background:#0006}#value-actions p{margin:8px 0}@media(max-width:800px){.value-card{width:100%}}
+.value-warning { margin: 1rem auto; padding: 0 1rem; max-width: 1200px; color: #777; font-size: 0.8rem; }
+.heat-stage canvas { max-height: none; object-fit: fill; }
+.value-action { display: grid; grid-template-columns: 65px 1fr 1fr; gap: 10px; align-items: center; font-variant-numeric: tabular-nums; }
+.value-action span:not(.action-label), .value-action strong { text-align: right; font-size: 14px; }
+.value-action.best strong { color: #078878; }

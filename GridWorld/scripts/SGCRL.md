@@ -1,6 +1,6 @@
 # GridWorldでのSGCRL実験
 
-SGCRL本体は`agents/grag_impl/grag_sgcrl.py`の`SGCRL`。
+SGCRL本体は`agents/sgcrl.py`の`SGCRL`。
 同じファイルの`GridWorldSGCRL`が既存の`TrainingSession`に接続する。
 既存の`agents.grag.GRAG`とは独立している。
 学習画面ではAIに「SGCRL」を選ぶ。初期収集の既定値は10,000遷移なので、

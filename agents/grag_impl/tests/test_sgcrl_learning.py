@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import torch
 
-from agents.grag_impl.grag_sgcrl import SGCRL, GridWorldSGCRL
+from agents.sgcrl import SGCRL, GridWorldSGCRL
 
 
 class SGCRLLearningTests(unittest.TestCase):

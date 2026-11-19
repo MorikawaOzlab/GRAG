@@ -26,3 +26,11 @@ class GridWorldAdapter:
         state[1, *observation["goal"]] = 1
         state[2, *observation["position"]] = 1
         return state
+
+    def encode_achieved_goal(self, observation: dict) -> torch.Tensor:
+        """到達した位置を対照学習用のゴールとして返す。"""
+        return torch.tensor(observation["position"], dtype=torch.float32)
+
+    def encode_goal(self, observation: dict) -> torch.Tensor:
+        """観測で指定された目標位置を返す。"""
+        return torch.tensor(observation["goal"], dtype=torch.float32)

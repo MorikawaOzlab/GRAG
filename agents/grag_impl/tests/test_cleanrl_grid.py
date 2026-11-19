@@ -31,7 +31,7 @@ class CleanRLGridTests(unittest.TestCase):
         cls.torch.set_num_threads(cls.threads)
 
     def test_tensor_network_uses_dimensions_instead_of_environment_object(self):
-        from agents.grag_impl.networks import Agent
+        from agents.legacy_grag.networks import Agent
         network = Agent(observation_size=7, action_size=3, hidden_size=8)
         states = self.torch.zeros(2, 7)
         generator = self.torch.Generator().manual_seed(5)

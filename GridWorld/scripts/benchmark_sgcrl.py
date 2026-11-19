@@ -13,7 +13,7 @@ from time import perf_counter
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 import torch
-from agents.grag_impl.grag_sgcrl import SGCRL
+from agents.sgcrl import SGCRL
 
 
 def main():

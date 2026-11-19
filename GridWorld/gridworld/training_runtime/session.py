@@ -199,9 +199,9 @@ class TrainingSession:
                             "衝突する方向も選択対象に含まれます。"}
 
     def inspect_grag_values(self) -> dict:
-        """?????? CRL ? Q ??????????????"""
+        """各マスの方策による期待Q値と行動ごとの差を返す。"""
         import torch
-        from agents.grag_impl.grag import GRAG, Transition, ACTIONS as GRAG_ACTIONS
+        from agents.grag_impl.grag import GRAG
         with self._lock:
             if not isinstance(self.agent, GRAG) or self.agent.actor is None:
                 return {"values": None}
@@ -215,13 +215,13 @@ class TrainingSession:
                     observation["position"] = [r, c]
                     observations.append(observation)
                     positions.append((r, c))
-            transitions = [Transition(state=self.agent.observation_to_tensor(o), action=0,
-                                      old_log_prob=0., reward=0., reached_goal=False,
-                                      goal_prompt=self.agent.generate_goal_prompt(o)) for o in observations]
             with torch.no_grad():
-                q = self.agent._compute_crl_q(transitions)
-                states = torch.stack([t.state for t in transitions])
-                probabilities = torch.softmax(self.agent.actor(states), dim=-1)
+                states = torch.stack([self.agent._prepare_state(o).reshape(-1) for o in observations])
+                goals = torch.stack([torch.as_tensor(self.agent.target_goal_encoder(o), dtype=torch.float32)
+                                     for o in observations])
+                q = self.agent.q_values(states, goals)
+                reference = next(self.agent.actor.parameters())
+                probabilities = torch.softmax(self.agent.actor(states.to(reference)), dim=-1).to(q)
                 values = (probabilities * q).sum(dim=-1)
                 advantages = q - values[:, None]
             grid = [[None for _ in range(self.world.map["cols"])] for _ in range(self.world.map["rows"])]
@@ -229,7 +229,8 @@ class TrainingSession:
                 value = float(values[i])
                 adv = [float(x) for x in advantages[i]]
                 if math.isfinite(value) and all(math.isfinite(x) for x in adv):
-                    grid[r][c] = {"value": value, "advantages": dict(zip(GRAG_ACTIONS, adv))}
+                    grid[r][c] = {"value": value, "advantages": dict(zip(self.agent.actions, adv)),
+                                  "q_values": dict(zip(self.agent.actions, map(float, q[i])))}
             return {"values": grid, "completed_episodes": self.completed_episodes, "total_steps": self.total_steps}
 
     def evaluate(self) -> list[dict]:

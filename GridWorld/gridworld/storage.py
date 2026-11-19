@@ -122,4 +122,7 @@ def load_settings() -> dict[str, Any]:
     raw = read_json(source) if source.exists() else {}
     clean = validate_settings({**DEFAULT_SETTINGS, **raw})
     clean.update({key: value for key, value in raw.items() if key.startswith(("ppo_", "crl_", "cppo_", "grag_"))})
+    for key in ("hindsight_gamma", "contrastive_learning_rate"):
+        if key in raw:
+            clean[key] = raw[key]
     return clean

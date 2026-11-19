@@ -4,7 +4,7 @@ from copy import deepcopy
 import unittest
 
 from agents.grag import GRAG
-from agents.grag_impl.goals import LanguageGoal
+from agents.legacy_grag.goals import LanguageGoal
 from gridworld.world import GridWorld
 
 

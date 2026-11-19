@@ -95,15 +95,25 @@ function trainingSettings() {
     value.ppo_hidden_size = Number($('ppo-hidden-size').value);
   }
   if (gragMode()) {
-    value.crl_gamma = Number($('crl-gamma').value);
-    value.crl_learning_rate = Number($('crl-learning-rate').value);
-    value.crl_actor_learning_rate = value.crl_learning_rate;
-    value.crl_hidden_size = Number($('crl-hidden-size').value);
-    value.crl_min_replay_size = Number($('crl-min-replay').value);
+    const gammaInput = $('crl-gamma').value;
+    const gamma = Number(gammaInput);
+    if (gammaInput.trim() === '' || !Number.isFinite(gamma) || gamma <= 0 || gamma >= 1)
+      throw Error('対照学習の割引率は0より大きく1未満にしてください。');
+    if ($('mode').value === 'grag') value.hindsight_gamma = gamma;
+    else value.crl_gamma = gamma;
+    const learningRate = Number($('crl-learning-rate').value);
+    if (!Number.isFinite(learningRate) || learningRate <= 0) throw Error('対照学習の学習率は正の数にしてください。');
+    if ($('mode').value === 'grag') value.contrastive_learning_rate = learningRate;
+    else {
+      value.crl_learning_rate = learningRate;
+      value.crl_actor_learning_rate = learningRate;
+      value.crl_hidden_size = Number($('crl-hidden-size').value);
+      value.crl_min_replay_size = Number($('crl-min-replay').value);
+    }
   }
   if ($('mode').value === 'grag') {
-    value.grag_positive_update_count = Number($('grag-positive-update-count').value);
-    if (!integer(value.grag_positive_update_count, 1, 1000000)) throw Error('成功軌道数は1〜1,000,000の整数にしてください。');
+    value.grag_update_interval = Number($('grag-update-interval').value);
+    if (!integer(value.grag_update_interval, 1, 1000000)) throw Error('更新間隔は1〜1,000,000の整数にしてください。');
   }
   if ($('mode').value === 'sgcrl') {
     value.crl_device = $('sgcrl-device').value;
@@ -333,7 +343,12 @@ async function openPolicyCell(row, col, anchor) {
   }
 }
 function render(data) {
-  if (result && (result.session_id !== data.session_id || result.mode !== data.mode || result.map.name !== data.map.name)) closePolicyPopup(false);
+  if (result && (result.session_id !== data.session_id || result.mode !== data.mode || result.map.name !== data.map.name)) {
+    closePolicyPopup(false);
+    closeValuePopup();
+    valueToken++; valueGrid = null; valueKey = null; $('value-warning').hidden = true;
+    drawValueMap();
+  }
   result = data; syncControls();
   if (!matches(data)) return;
   selectedMap = data.map;
@@ -343,6 +358,8 @@ function render(data) {
 }
 async function chooseMap() {
   valueToken++; valueGrid = null; valueKey = null; $('value-section').hidden = true;
+  $('value-warning').hidden = true;
+  closeValuePopup();
   closePolicyPopup(false);
   if (!$('map-list').value) return;
   selectedMap = await api('/api/maps/' + encodeURIComponent($('map-list').value));
@@ -544,11 +561,13 @@ if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => redrawHeat()
     for (const agent of agents) if (![...$('mode').options].some(option => option.value === agent.key)) $('mode').add(new Option(agent.name, agent.key));
     const ids = { max_steps: 'max-steps', seed: 'seed', discount_factor: 'discount-factor', learning_rate: 'learning-rate',
       epsilon: 'epsilon', epsilon_decay: 'epsilon-decay', min_epsilon: 'min-epsilon', ppo_learning_rate: 'ppo-learning-rate', ppo_hidden_size: 'ppo-hidden-size',
-      crl_gamma: 'crl-gamma', crl_learning_rate: 'crl-learning-rate', crl_hidden_size: 'crl-hidden-size', crl_min_replay_size: 'crl-min-replay',
-      grag_positive_update_count: 'grag-positive-update-count',
+      crl_hidden_size: 'crl-hidden-size', crl_min_replay_size: 'crl-min-replay',
+      grag_update_interval: 'grag-update-interval',
       crl_device: 'sgcrl-device', crl_batch_size: 'crl-batch-size', crl_replay_cache_mb: 'crl-cache-mb' };
     for (const [key, id] of Object.entries(cppoFields)) ids['cppo_' + key] = id;
     for (const [key, id] of Object.entries(ids)) if (config[key] !== undefined) $(id).value = config[key] ?? '';
+    $('crl-gamma').value = ($('mode').value === 'grag' ? config.hindsight_gamma : config.crl_gamma) ?? 0.99;
+    $('crl-learning-rate').value = ($('mode').value === 'grag' ? config.contrastive_learning_rate : config.crl_learning_rate) ?? 0.0003;
     await chooseMap();
     initialized = true; syncControls(); poll();
     if (!maps.length) message('マップ作成アプリでマップを保存してください。');
@@ -557,6 +576,8 @@ if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => redrawHeat()
       if (!job?.job_id && !result?.session_id && !busy && maps.some(map => map.name === saved.map.name) && [...$('mode').options].some(option => option.value === saved.mode)) {
         $('map-list').value = saved.map.name; $('mode').value = saved.mode;
         for (const [key, id] of Object.entries(ids)) if (saved.settings[key] !== undefined) $(id).value = saved.settings[key] ?? '';
+        $('crl-gamma').value = (saved.mode === 'grag' ? saved.settings.hindsight_gamma : saved.settings.crl_gamma) ?? 0.99;
+        $('crl-learning-rate').value = (saved.mode === 'grag' ? saved.settings.contrastive_learning_rate : saved.settings.crl_learning_rate) ?? 0.0003;
         render(saved);
         message('前回の学習状態を読み込みました。観察または高速学習を続けられます。');
       }
@@ -569,7 +590,7 @@ let valueGrid = null, valueMap = null, valueTimer = null, valueToken = 0, valueK
 function scheduleValueMap(data) {
   const visible = data?.mode === 'grag' && matches(data);
   $('value-section').hidden = !visible;
-  if (!visible) { valueToken++; valueGrid = null; valueKey = null; return; }
+  if (!visible) { valueToken++; valueGrid = null; valueKey = null; closeValuePopup(); $('value-warning').hidden = true; return; }
   const key = data.session_id + ':' + data.total_steps;
   if (key === valueKey) return;
   valueKey = key;
@@ -578,16 +599,32 @@ function scheduleValueMap(data) {
 async function refreshValueMap(data = result) {
   if (!data || data.mode !== 'grag' || !matches(data)) return;
   const token = ++valueToken;
-  $('value-status').textContent = '?????????????';
+  $('value-status').textContent = '価値を取得しています。';
   try {
     const snapshot = await api('/api/train/grag-values', {session_id: data.session_id, mode: data.mode, map_name: data.map.name});
     if (token !== valueToken || !matches(result) || result.session_id !== data.session_id) return;
+    if (!snapshot.values) {
+      $('value-warning').textContent = snapshot.warning || '価値ヒートマップを取得できませんでした。';
+      $('value-warning').hidden = false;
+      $('value-status').textContent = valueGrid ? '更新できませんでした。前回取得した値を表示しています。' : '価値を取得できませんでした。';
+      return;
+    }
     valueGrid = snapshot.values; valueMap = data.map;
-    $('value-status').textContent = valueGrid ? `?? ${snapshot.completed_episodes}? / ${snapshot.total_steps}??????????????????????????????????` : '??????????????';
+    $('value-warning').hidden = true;
+    $('value-status').textContent = `学習 ${snapshot.completed_episodes}回 / ${snapshot.total_steps}ステップ時点の値`;
     drawValueMap();
-  } catch (error) { if (token === valueToken) $('value-status').textContent = '???????????????: ' + error.message; }
+    if (selectedValueCell && valueAnchor && !$('value-popup').hidden) {
+      openValueCell(selectedValueCell.row, selectedValueCell.col, valueAnchor.x, valueAnchor.y);
+    }
+  } catch (error) {
+    if (token === valueToken && matches(result) && result.session_id === data.session_id) {
+      $('value-warning').textContent = '価値ヒートマップを取得できませんでした。';
+      $('value-warning').hidden = false;
+      $('value-status').textContent = valueGrid ? '更新できませんでした。前回取得した値を表示しています。' : '価値を取得できませんでした。';
+    }
+  }
 }
-let selectedValueCell = null;
+let selectedValueCell = null, valueAnchor = null;
 function drawValueMap() {
   const canvas = $('value-map'), context = canvas.getContext('2d');
   if (!valueGrid || !valueMap) { context.clearRect(0, 0, canvas.width, canvas.height); return; }
@@ -623,20 +660,22 @@ function drawValueMap() {
   }
   if (selectedValueCell) { context.strokeStyle = '#078878'; context.lineWidth = Math.max(3, unit * .045); context.strokeRect(selectedValueCell.col * unit + 3, selectedValueCell.row * unit + 3, unit - 6, unit - 6); }
 }
-function closeValuePopup() { $('value-popup').hidden = true; selectedValueCell = null; drawValueMap(); }
+function closeValuePopup() { $('value-popup').hidden = true; selectedValueCell = null; valueAnchor = null; drawValueMap(); }
 function openValueCell(row, col, x, y) {
   const cell = valueGrid?.[row]?.[col]; if (!cell) return;
-  selectedValueCell = {row, col}; drawValueMap();
-  $('value-title').textContent = `?? [${row}, ${col}] ????????`;
+  selectedValueCell = {row, col}; valueAnchor = {x, y}; drawValueMap();
+  $('value-title').textContent = `マス [${row}, ${col}] の行動価値`;
   $('value-snapshot').textContent = $('value-status').textContent;
-  const directions = [['up','? ?'],['down','? ?'],['left','? ?'],['right','? ?']];
-  const maxAbs = Math.max(...directions.map(([key]) => Math.abs(cell.advantages[key])), 1e-12);
+  const directions = [['up','↑ 上'],['down','↓ 下'],['left','← 左'],['right','→ 右']];
   const best = Math.max(...directions.map(([key]) => cell.advantages[key]));
   $('value-actions').replaceChildren(...directions.map(([key,label]) => {
-    const row = document.createElement('div'), name = document.createElement('span'), track = document.createElement('div'), fill = document.createElement('div'), number = document.createElement('strong');
-    row.className = 'action-probability' + (cell.advantages[key] === best ? ' best' : '');
-    name.className = 'action-label'; name.textContent = label; track.className = 'action-track'; fill.className = 'action-fill'; fill.style.width = (Math.abs(cell.advantages[key]) / maxAbs * 100) + '%';
-    number.textContent = cell.advantages[key].toPrecision(3); track.append(fill); row.append(name, track, number); return row;
+    const row = document.createElement('div'), name = document.createElement('span');
+    const qValue = document.createElement('span'), advantage = document.createElement('strong');
+    row.className = 'value-action' + (cell.advantages[key] === best ? ' best' : '');
+    name.className = 'action-label'; name.textContent = label;
+    qValue.textContent = 'Q ' + cell.q_values[key].toPrecision(3);
+    advantage.textContent = 'A ' + (cell.advantages[key] > 0 ? '+' : '') + cell.advantages[key].toPrecision(3);
+    row.append(name, qValue, advantage); return row;
   }));
   const popup = $('value-popup'); popup.hidden = false;
   const rect = popup.getBoundingClientRect(), margin = 12;

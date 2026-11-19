@@ -73,6 +73,34 @@ class SessionApiTests(unittest.TestCase):
         self.assertEqual(result["settings"]["grag_positive_update_count"], 8)
         self.assertEqual(result["successes"], 0)
 
+    def test_grag_hindsight_gamma_reaches_agent_and_is_persisted(self):
+        result = self.wait(self.post("/api/train", {
+            "map_name": MAP["name"], "mode": "grag", "episodes": 1,
+            "training_settings": {"max_steps": 1, "hindsight_gamma": 0.9,
+                                  "grag_update_interval": 256, "contrastive_learning_rate": 0.0007},
+        }))
+        session = training_app.learning_sessions[result["session_id"]]["session"]
+        self.assertEqual(session.agent.hindsight_gamma, 0.9)
+        self.assertEqual(session.agent.UPDATE_INTERVAL, 256)
+        self.assertEqual(session.agent.contrastive_optimizer.param_groups[0]["lr"], 0.0007)
+        self.assertEqual(result["settings"]["hindsight_gamma"], 0.9)
+        with patch.object(storage, "SETTINGS", self.base_path / "settings.json"):
+            self.assertEqual(storage.load_settings()["hindsight_gamma"], 0.9)
+            self.assertEqual(storage.load_settings()["grag_update_interval"], 256)
+            self.assertEqual(storage.load_settings()["contrastive_learning_rate"], 0.0007)
+
+    def test_grag_rejects_invalid_hindsight_gamma(self):
+        with self.assertRaises(HTTPError) as error:
+            self.post("/api/train", {"map_name": MAP["name"], "mode": "grag", "episodes": 1,
+                                     "training_settings": {"max_steps": 1, "hindsight_gamma": 1}})
+        self.assertEqual(error.exception.code, 400)
+
+    def test_grag_rejects_invalid_update_interval(self):
+        with self.assertRaises(HTTPError) as error:
+            self.post("/api/train", {"map_name": MAP["name"], "mode": "grag", "episodes": 1,
+                                     "training_settings": {"max_steps": 1, "grag_update_interval": 0}})
+        self.assertEqual(error.exception.code, 400)
+
     def test_start_continue_evaluate_and_restart_keep_cumulative_learning(self):
         first = self.wait(self.post("/api/train", {"map_name": MAP["name"], "episodes": 100}))
         self.assertEqual(first["settings"]["episodes"], 100)

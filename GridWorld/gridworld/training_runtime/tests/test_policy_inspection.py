@@ -27,6 +27,31 @@ PPO_SETTINGS = {**SETTINGS, "seed": 7, "max_steps": 6, "ppo_hidden_size": 8,
                 "ppo_epochs": 1, "ppo_rollout_steps": 4, "ppo_minibatch_size": 4}
 
 
+@unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is required")
+class GRAGValueInspectionTests(unittest.TestCase):
+    def test_values_match_current_q_and_leave_training_state_unchanged(self):
+        import torch
+        session = TrainingSession(MAP, PPO_SETTINGS, GRAGSession)
+        agent = session.agent
+        rng = agent._generator.get_state().clone()
+        snapshot = session.inspect_grag_values()
+        observation = session.world.observation()
+        state = agent._prepare_state(observation).reshape(1, -1)
+        goal = agent.target_goal_encoder(observation).reshape(1, -1)
+        with torch.no_grad():
+            q = agent.q_values(state, goal)[0]
+            probabilities = agent.actor(state).softmax(-1)[0]
+            value = (q * probabilities).sum().item()
+        row, col = observation["position"]
+        cell = snapshot["values"][row][col]
+        self.assertAlmostEqual(cell["value"], value, places=5)
+        for index, action in enumerate(agent.actions):
+            self.assertAlmostEqual(cell["advantages"][action], q[index].item() - value, places=5)
+            self.assertAlmostEqual(cell["q_values"][action], q[index].item(), places=5)
+        self.assertTrue(torch.equal(rng, agent._generator.get_state()))
+        self.assertIsNone(agent.pending)
+
+
 class QPolicyTests(unittest.TestCase):
     def test_ai_configuration_is_separate_and_limit_uses_public_method(self):
         session = TrainingSession(MAP, SETTINGS)
@@ -184,6 +209,17 @@ class PolicyApiTests(unittest.TestCase):
     get = test_api.SessionApiTests.get
     post = test_api.SessionApiTests.post
     wait = test_api.SessionApiTests.wait
+
+    @unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is required")
+    def test_grag_value_failure_returns_warning(self):
+        sid = "a" * 32
+        session = TrainingSession(MAP, PPO_SETTINGS, GRAGSession)
+        training_app.learning_sessions[sid] = {"mode": "grag", "session": session}
+        with patch.object(session, "inspect_grag_values", side_effect=RuntimeError("unavailable")):
+            result = self.post("/api/train/grag-values", {
+                "session_id": sid, "mode": "grag", "map_name": MAP["name"]})
+        self.assertIsNone(result["values"])
+        self.assertIn("warning", result)
 
     def test_saved_policy_inspection_does_not_start_jobs_write_files_or_cache_models(self):
         result = self.wait(self.post("/api/train", {"map_name": MAP["name"], "episodes": 2}))

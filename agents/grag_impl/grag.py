@@ -9,9 +9,11 @@
 """
 
 from copy import deepcopy
+import math
 
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 ACTIONS = ("up", "down", "left", "right")
 
@@ -19,23 +21,53 @@ ACTIONS = ("up", "down", "left", "right")
 class GRAG:
     """Actorによる行動選択と、エピソード単位の経験収集を行う。"""
 
+    UPDATE_INTERVAL = 128*10
+
     def __init__(self, settings: dict):
         """設定と経験収集用のメモリを初期化する。"""
         self.settings = settings
+        self.UPDATE_INTERVAL = settings.get("grag_update_interval", self.UPDATE_INTERVAL)
+        if type(self.UPDATE_INTERVAL) is not int or not 1 <= self.UPDATE_INTERVAL <= 1_000_000:
+            raise ValueError("grag_update_intervalは1〜1,000,000の整数にしてください。")
         self.actions = tuple(settings.get("actions", ACTIONS))
         if not self.actions:
             raise ValueError("actionsには1つ以上の行動を指定してください。")
         self.observation_encoder = settings.get("observation_encoder")
         if self.observation_encoder is not None and not callable(self.observation_encoder):
             raise ValueError("observation_encoderは呼び出し可能にしてください。")
+        self.achieved_goal_encoder = settings.get("achieved_goal_encoder")
+        if self.achieved_goal_encoder is not None and not callable(self.achieved_goal_encoder):
+            raise ValueError("achieved_goal_encoderは呼び出し可能にしてください。")
+        self.target_goal_encoder = settings.get("target_goal_encoder")
+        if self.target_goal_encoder is not None and not callable(self.target_goal_encoder):
+            raise ValueError("target_goal_encoderは呼び出し可能にしてください。")
+        self.contrastive_learning_rate = settings.get("contrastive_learning_rate", 3e-4)
+        if (isinstance(self.contrastive_learning_rate, bool)
+                or not isinstance(self.contrastive_learning_rate, (int, float))
+                or not math.isfinite(self.contrastive_learning_rate)
+                or self.contrastive_learning_rate <= 0):
+            raise ValueError("contrastive_learning_rateは正の有限数にしてください。")
+        self.hindsight_gamma = settings.get("hindsight_gamma", 0.99)
+        if (isinstance(self.hindsight_gamma, bool)
+                or not isinstance(self.hindsight_gamma, (int, float))
+                or not math.isfinite(self.hindsight_gamma)
+                or not 0 < self.hindsight_gamma < 1):
+            raise ValueError("hindsight_gammaは0より大きく1未満にしてください。")
 
         self.sa_encoder = None
         self.goal_encoder = None
         self.actor = None
+        self.contrastive_optimizer = None
+        self.actor_optimizer = None
+        self.policy_loss = None
+        self.contrastive_loss = None
+        self._contrastive_pending = []  # 異なるエピソードの負例が揃うまで保持
         self._network_spec = None
         self.episodes = []    # 終了したエピソードの軌跡
         self.trajectory = []  # 現在のエピソードの遷移
         self.pending = None   # 行動選択後、learn()を待っている情報
+        self._update_batch = []  # 次の更新までに収集した遷移
+        self._episode_id = 0
         self._generator = torch.Generator(device="cpu")
         seed = settings.get("seed")
         if seed is None:
@@ -65,6 +97,12 @@ class GRAG:
             state_dim, goal_dim, action_dim = problem.network_dimensions(len(self.actions))
             if not callable(getattr(problem, "encode_observation", None)):
                 raise ValueError("problemにはencode_observationが必要です。")
+            goal_encoder = getattr(problem, "encode_achieved_goal", self.achieved_goal_encoder)
+            if goal_encoder is not None and not callable(goal_encoder):
+                raise ValueError("encode_achieved_goalは呼び出し可能にしてください。")
+            target_encoder = getattr(problem, "encode_goal", self.target_goal_encoder)
+            if target_encoder is not None and not callable(target_encoder):
+                raise ValueError("encode_goalは呼び出し可能にしてください。")
         if action_dim is None:
             action_dim = len(self.actions)
         if any(type(n) is not int or n <= 0 for n in (state_dim, goal_dim, action_dim)):
@@ -77,6 +115,8 @@ class GRAG:
                 raise ValueError("初期化済みネットワークの次元は変更できません。")
             if problem is not None:
                 self.observation_encoder = problem.encode_observation
+                self.achieved_goal_encoder = goal_encoder
+                self.target_goal_encoder = target_encoder
             return
         repr_dim = 64
 
@@ -106,9 +146,16 @@ class GRAG:
 
             self.sa_encoder = build_encoder(state_dim + action_dim)
             self.goal_encoder = build_encoder(goal_dim)
+        self.contrastive_optimizer = torch.optim.Adam(
+            list(self.sa_encoder.parameters()) + list(self.goal_encoder.parameters()),
+            lr=self.contrastive_learning_rate,
+        )
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=3e-4, eps=1e-5)
         self._network_spec = spec
         if problem is not None:
             self.observation_encoder = problem.encode_observation
+            self.achieved_goal_encoder = goal_encoder
+            self.target_goal_encoder = target_encoder
 
     def initialize_for_gridworld(self, map_data: dict) -> None:
         """GridWorldのマップから特徴次元を決める。"""
@@ -187,15 +234,21 @@ class GRAG:
             raise RuntimeError("learn()には直前に選択した行動を渡してください。")
         
         next_state = self._prepare_state(next_observation)
-        self.trajectory.append({
+        transition = {
             **self.pending,
             "reward": reward,
             "next_observation": deepcopy(next_observation),
             "next_state": next_state,
             "reached_goal": reached_goal,
-        })
+            "episode_id": self._episode_id,
+        }
+        self.trajectory.append(transition)
+        self._update_batch.append(transition)
 
         self.pending = None
+        if len(self._update_batch) == self.UPDATE_INTERVAL:
+            self._update_networks(self._update_batch)
+            self._update_batch = []
 
     def end_episode(self) -> None:
         """ゴール到達または最大行動回数で試行が終わるたびに呼ばれる。"""
@@ -204,6 +257,182 @@ class GRAG:
         if self.trajectory:
             self.episodes.append(self.trajectory)
             self.trajectory = []
+            self._episode_id += 1
+
+    def _update_networks(self, transitions: list) -> None:
+        """収集した経験を対照学習とPPOの更新に渡す。"""
+        if self._update_contrastive(transitions):
+            self._update_ppo(transitions)
+
+    def _sample_hindsight_goals(self, transitions: list) -> torch.Tensor:
+        """各遷移から、同一エピソード内の将来の到達ゴールを選択する。"""
+
+        future_goals = []
+
+        for index, transition in enumerate(transitions):
+
+            # 1. 同一エピソードの現在以降の経験を取得
+            episode_id = transition["episode_id"]
+
+            candidates = [
+                i for i in range(index, len(transitions))
+                if transitions[i]["episode_id"] == episode_id
+            ]
+
+            # 2. 時間的に近い経験ほど高い確率で選択
+            distances = torch.arange(
+                len(candidates), dtype=torch.float32
+            )
+            weights = self.hindsight_gamma ** distances
+
+            sampled_index = torch.multinomial(
+                weights, num_samples=1, generator=self._generator
+            ).item()
+
+            future_transition = transitions[candidates[sampled_index]]
+
+            # 3. 選択した経験から到達ゴールを取得
+            if self.achieved_goal_encoder is not None:
+                goal = self.achieved_goal_encoder(
+                    future_transition["next_observation"]
+                )
+            else:
+                goal = future_transition["next_state"]
+
+            goal = torch.as_tensor(
+                goal, dtype=torch.float32
+            ).detach().reshape(-1)
+
+            # 4. ゴールの次元数と値を検証
+            goal_dim = self._network_spec[1]
+
+            if goal.numel() != goal_dim or not torch.isfinite(goal).all():
+                raise ValueError(
+                    "到達ゴールはgoal_dimと一致する有限の値にしてください。"
+                )
+
+            # 5. ゴールを保存
+            future_goals.append(goal)
+
+        return torch.stack(future_goals)
+
+    def _update_contrastive(self, transitions: list) -> bool:
+        """InfoNCEで更新できた場合にTrueを返す。"""
+
+        # 1. 経験の蓄積
+        self._contrastive_pending.extend(transitions)
+        batch = self._contrastive_pending
+
+        episode_ids = torch.tensor([t["episode_id"] for t in batch])
+
+        # 異なるエピソードが2つ以上必要
+        if episode_ids.unique().numel() < 2:
+            self.contrastive_loss = None
+            return False
+
+        # 2. 学習データの準備
+        reference = next(self.sa_encoder.parameters())
+        device = reference.device
+
+        states = torch.stack([
+            t["state"].reshape(-1) for t in batch
+        ]).to(reference)
+
+        actions = torch.tensor(
+            [t["action"] for t in batch],
+            device=device,
+        )
+        actions = F.one_hot(
+            actions, num_classes=len(self.actions)
+        ).to(reference)
+
+        goals = self._sample_hindsight_goals(batch).to(reference)
+
+        # 3. エンコード
+        sa_inputs = torch.cat([states, actions], dim=-1)
+
+        sa_repr = self.sa_encoder(sa_inputs)
+        goal_repr = self.goal_encoder(goals)
+
+        # 4. InfoNCE損失の計算
+        logits = -torch.cdist(sa_repr, goal_repr)
+
+        episode_ids = episode_ids.to(device)
+        labels = torch.arange(len(batch), device=device)
+
+        # 同一エピソード内の他の経験を負例から除外
+        allowed = episode_ids[:, None] != episode_ids[None, :]
+        allowed[labels, labels] = True
+
+        logits = logits.masked_fill(~allowed, -torch.inf)
+        loss = F.cross_entropy(logits, labels)
+
+        # 5. パラメータ更新
+        self.contrastive_optimizer.zero_grad()
+        loss.backward()
+
+        parameters = (
+            list(self.sa_encoder.parameters())
+            + list(self.goal_encoder.parameters())
+        )
+        nn.utils.clip_grad_norm_(parameters, max_norm=0.5)
+
+        self.contrastive_optimizer.step()
+
+        # 学習結果の保存と経験の初期化
+        self.contrastive_loss = loss.detach().item()
+        self._contrastive_pending = []
+        return True
+
+    def q_values(self, states: torch.Tensor, goals: torch.Tensor) -> torch.Tensor:
+        """各状態・ゴールに対する全行動の対照Q値を返す。"""
+        reference = next(self.actor.parameters())
+        states = states.reshape(states.shape[0], -1).to(reference)
+        goals = goals.reshape(goals.shape[0], -1).to(reference)
+        action_count = len(self.actions)
+        actions = torch.eye(action_count, device=reference.device, dtype=reference.dtype)
+        all_states = states.repeat_interleave(action_count, dim=0)
+        state_actions = torch.cat((all_states, actions.repeat(len(states), 1)), dim=-1)
+        state_action_repr = self.sa_encoder(state_actions)
+        goal_repr = self.goal_encoder(goals).repeat_interleave(action_count, dim=0)
+        return -torch.linalg.vector_norm(state_action_repr - goal_repr, dim=-1).reshape(-1, action_count)
+
+    def _update_ppo(self, transitions: list) -> None:
+        """対照学習のQ値からadvantageを計算し、PPOでActorを更新する。"""
+        reference = next(self.actor.parameters())
+        states = torch.stack([row["state"].reshape(-1) for row in transitions]).to(reference)
+        actions = torch.tensor([row["action"] for row in transitions], device=reference.device)
+        old_log_probs = torch.tensor([row["log_prob"] for row in transitions],
+                                     dtype=reference.dtype, device=reference.device)
+        goals = []
+        for row in transitions:
+            goal = (self.target_goal_encoder(row["observation"])
+                    if self.target_goal_encoder is not None else row["state"])
+            goal = torch.as_tensor(goal, dtype=torch.float32).detach().reshape(-1)
+            if goal.numel() != self._network_spec[1] or not torch.isfinite(goal).all():
+                raise ValueError("目標ゴールはgoal_dimと一致する有限の値にしてください。")
+            goals.append(goal)
+        goals = torch.stack(goals).to(reference)
+
+        with torch.no_grad():
+            q_values = self.q_values(states, goals)
+            probabilities = torch.softmax(self.actor(states), dim=-1)
+            baseline = (probabilities * q_values).sum(dim=-1)
+            advantages = q_values.gather(1, actions[:, None]).squeeze(1) - baseline
+            if len(transitions) > 1:
+                advantages = (advantages - advantages.mean()) / (advantages.std(unbiased=False) + 1e-8)
+
+        for _ in range(4):
+            distribution = torch.distributions.Categorical(logits=self.actor(states))
+            ratio = (distribution.log_prob(actions) - old_log_probs).exp()
+            clipped_ratio = ratio.clamp(0.8, 1.2)
+            policy_loss = -torch.minimum(ratio * advantages, clipped_ratio * advantages).mean()
+            loss = policy_loss - 0.01 * distribution.entropy().mean()
+            self.actor_optimizer.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(self.actor.parameters(), 0.5)
+            self.actor_optimizer.step()
+        self.policy_loss = float(policy_loss.detach())
 
     def export(self) -> dict:
         """保存用のJSONに変換可能な辞書を返す。

@@ -12,7 +12,7 @@ from urllib.parse import unquote
 
 from agents.q_learning import QLearningAgent
 from agents.cppo import CPPOAgent
-from agents.grag_impl.grag_sgcrl import GridWorldSGCRL
+from agents.sgcrl import GridWorldSGCRL
 from gridworld.storage import (RESULT, WORLD, list_maps, load_settings,
                      map_path, read_json, validate_map, validate_settings, write_json)
 from gridworld.training_runtime import TrainingSession
@@ -309,8 +309,13 @@ class TrainingHandler(Handler):
                 raise ValueError("行動確率を確認するマップが学習時と一致しません。")
             if mode in PPO_MODES:
                 configure_ppo_cpu_threads()
-            data = (session.inspect_grag_values() if path == "/api/train/grag-values"
-                    else session.inspect_policy(request.get("position")))
+            if path == "/api/train/grag-values":
+                try:
+                    data = session.inspect_grag_values()
+                except Exception:
+                    data = {"values": None, "warning": "価値ヒートマップを取得できませんでした。"}
+            else:
+                data = session.inspect_policy(request.get("position"))
             return self.json({**data, "session_id": sid, "mode": mode,
                               "map_name": session.world.map["name"]})
         if path == "/api/train/control":

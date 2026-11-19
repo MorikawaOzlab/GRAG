@@ -4,7 +4,7 @@ import unittest
 
 import torch
 
-from agents.grag_impl.grag_sgcrl import SGCRL
+from agents.sgcrl import SGCRL
 
 
 class SGCRLNetworkTests(unittest.TestCase):
