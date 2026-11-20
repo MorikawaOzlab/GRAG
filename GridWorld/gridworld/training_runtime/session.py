@@ -163,7 +163,7 @@ class TrainingSession:
             if state["finished"] and progress and (completed % interval == 0 or completed == episodes):
                 progress(completed)
 
-    def inspect_policy(self, position: list[int]) -> dict:
+    def inspect_policy(self, position: list[int], goal=None) -> dict:
         """指定マスにいると仮定した現在の方策。1行動の学習との間で取得する。"""
         if (not isinstance(position, list) or len(position) != 2
                 or any(type(value) is not int for value in position)
@@ -171,12 +171,25 @@ class TrainingSession:
                 or not 0 <= position[1] < self.world.map["cols"]):
             raise ValueError("確認するマスは範囲内の[行, 列]にしてください。")
         with self._lock:
+            if goal is not None:
+                from agents.grag_impl.grag import GRAG
+                if not isinstance(self.agent, GRAG):
+                    raise ValueError("目標を指定した方策表示はGRAGに対応しています。")
+                if (not isinstance(goal, list) or len(goal) != 2
+                        or any(type(value) is not int for value in goal)
+                        or not 0 <= goal[0] < self.world.map["rows"]
+                        or not 0 <= goal[1] < self.world.map["cols"]
+                        or goal in self.world.map["obstacles"]):
+                    raise ValueError("目標座標は障害物でない範囲内の[行, 列]にしてください。")
+            else:
+                goal = list(self.world.map["goal"])
             r, c = position
             wall = position in self.world.map["obstacles"]
             inspect = getattr(self.agent, "action_probabilities", None)
             supported = callable(inspect) and not wall
             observation = self.world.observation()
             observation["position"] = position.copy()
+            observation["goal"] = goal.copy()
             probabilities = None
             if supported:
                 try:
@@ -191,7 +204,7 @@ class TrainingSession:
                 raise ValueError("AIの行動確率は4方向の確率（合計1）で返してください。")
             return {"position": position.copy(), "probabilities": probabilities,
                     "supported": supported, "wall": wall,
-                    "goal": position == self.world.map["goal"],
+                    "goal": position == goal, "selected_goal": goal.copy(),
                     "visits": self.visits[r][c],
                     "completed_episodes": self.completed_episodes, "total_steps": self.total_steps,
                     "blocked_actions": [] if wall else [action for action in ACTIONS
@@ -199,7 +212,7 @@ class TrainingSession:
                     "note": "障害物のマスには移動できません。" if wall else
                             "このAIは行動確率の表示に対応していません。" if not supported else
                             "ゴール到達時には試行が終了します。表示はこの位置を入力した方策の出力です。"
-                            if position == self.world.map["goal"] else
+                            if position == goal else
                             "衝突する方向も選択対象に含まれます。"}
 
     def inspect_grag_values(self, goal=None) -> dict:

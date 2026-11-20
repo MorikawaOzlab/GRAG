@@ -8,6 +8,24 @@ from agents.grag_impl.gridworld_adapter import GridWorldAdapter
 
 
 class ContrastiveUpdateTests(unittest.TestCase):
+    def test_contrastive_epochs_reuse_immediate_goal(self):
+        agent = GRAG({"seed": 1, "actions": (0, 1), "grag_contrastive_epochs": 3})
+        agent.initialize_networks(1, 1)
+        batch = [{"episode_id": 0, "state": torch.tensor([1.]), "action": 0,
+                  "next_state": torch.tensor([3.])},
+                 {"episode_id": 0, "state": torch.tensor([2.]), "action": 1,
+                  "next_state": torch.tensor([4.])}]
+        with patch.object(agent.goal_encoder, "forward", wraps=agent.goal_encoder.forward) as encode, \
+             patch.object(agent.contrastive_optimizer, "step", wraps=agent.contrastive_optimizer.step) as step:
+            self.assertTrue(agent._update_contrastive(batch))
+        self.assertEqual([call.args[0][:, 0].tolist() for call in encode.call_args_list], [[3., 4.]] * 3)
+        self.assertEqual(step.call_count, 3)
+
+    def test_invalid_contrastive_epochs_are_rejected(self):
+        for value in (0, -1, True, 1.5, 1001):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                GRAG({"grag_contrastive_epochs": value})
+
     def test_initial_actor_update_uses_preupdate_critic(self):
         agent = GRAG({"seed": 1, "actions": (0, 1),
                       "target_goal_encoder": lambda obs: [0.]})
@@ -35,20 +53,21 @@ class ContrastiveUpdateTests(unittest.TestCase):
             agent._update_networks(transitions)
         self.assertEqual(events, ["q", "actor", "actor", "actor", "actor", "critic"])
 
-    def test_infonce_uses_negative_euclidean_distances(self):
+    def test_infonce_uses_dot_products(self):
         agent = GRAG({"seed": 1, "actions": (0, 1)})
         agent.initialize_networks(1, 1)
-        batch = [{"episode_id": 0, "state": torch.tensor([1.]), "action": 0},
-                 {"episode_id": 1, "state": torch.tensor([2.]), "action": 1}]
-        goals = torch.tensor([[3.], [4.]])
-        inputs = torch.tensor([[1., 1., 0.], [2., 0., 1.]])
+        batch = [{"episode_id": 0, "state": torch.tensor([1.]), "action": 0,
+                  "next_state": torch.tensor([3.])},
+                 {"episode_id": 1, "state": torch.tensor([2.]), "action": 1,
+                  "next_state": torch.tensor([4.])}]
+        goals = torch.tensor([[3.], [4.]], device=next(agent.sa_encoder.parameters()).device)
+        inputs = torch.tensor([[1., 1., 0.], [2., 0., 1.]], device=next(agent.sa_encoder.parameters()).device)
         with torch.no_grad():
             sa = agent.sa_encoder(inputs)
             goal = agent.goal_encoder(goals)
-            expected = -torch.cdist(sa, goal)
+            expected = sa @ goal.T
         original_loss = torch.nn.functional.cross_entropy
-        with patch.object(agent, "_sample_hindsight_goals", return_value=goals), \
-             patch("agents.grag_impl.grag.F.cross_entropy", wraps=original_loss) as loss:
+        with patch("agents.grag_impl.grag.F.cross_entropy", wraps=original_loss) as loss:
             self.assertTrue(agent._update_contrastive(batch))
         torch.testing.assert_close(loss.call_args.args[0], expected)
 
@@ -93,13 +112,13 @@ class ContrastiveUpdateTests(unittest.TestCase):
         step([0, 0], [0, 1])
         step([0, 1], [1, 1])
         agent.end_episode()
-        self.assertIsNone(agent.contrastive_loss)
+        self.assertIsNotNone(agent.contrastive_loss)
         step([1, 0], [0, 0])
         step([0, 0], [1, 0])
         agent.end_episode()
 
         self.assertTrue(torch.isfinite(torch.tensor(agent.contrastive_loss)))
-        self.assertEqual(agent._contrastive_pending, [])
+        self.assertEqual(len(agent.episodes), 2)
         self.assertTrue(any(not torch.equal(a, b) for a, b in zip(before_sa, agent.sa_encoder.parameters())))
         self.assertTrue(any(not torch.equal(a, b) for a, b in zip(before_goal, agent.goal_encoder.parameters())))
         self.assertTrue(any(not torch.equal(a, b) for a, b in zip(before_actor, agent.actor.parameters())))

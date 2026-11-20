@@ -323,7 +323,7 @@ class TrainingHandler(Handler):
                 except Exception:
                     data = {"values": None, "warning": "価値ヒートマップを取得できませんでした。"}
             else:
-                data = session.inspect_policy(request.get("position"))
+                data = session.inspect_policy(request.get("position"), request.get("goal"))
             return self.json({**data, "session_id": sid, "mode": mode,
                               "map_name": session.world.map["name"]})
         if path == "/api/train/control":

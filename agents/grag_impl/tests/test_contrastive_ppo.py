@@ -43,15 +43,15 @@ class ContrastivePPOTests(unittest.TestCase):
             agent.end_episode()
         self.assertEqual(len(stepped), 2)
         self.assertEqual(agent.updates, 1)
-    def test_q_values_are_negative_euclidean_distances(self):
+    def test_q_values_are_dot_products(self):
         agent = GRAG({"seed": 2, "actions": (0, 1)})
         agent.initialize_networks(1, 1)
         agent.sa_encoder = StateActionEncoder()
         agent.goal_encoder = NegativeGoalEncoder()
         values = agent.q_values(torch.tensor([[1.], [2.]]), torch.tensor([[0.], [3.]]))
-        torch.testing.assert_close(values, torch.tensor([[-1., -2.], [-1., -2.]]))
+        torch.testing.assert_close(values, torch.tensor([[0., -1.], [0., -1.]]))
 
-    def test_q_distance_uses_representation_magnitude_and_zero_vectors_are_finite(self):
+    def test_q_dot_product_uses_representation_magnitude_and_zero_vectors_are_finite(self):
         class StateAction(nn.Module):
             def forward(self, x):
                 return torch.stack((x[:, 0] * x[:, 1], x[:, 0] * x[:, 2]), dim=-1)
@@ -64,7 +64,7 @@ class ContrastivePPOTests(unittest.TestCase):
         agent.initialize_networks(1, 1)
         agent.sa_encoder, agent.goal_encoder = StateAction(), Goal()
         q = agent.q_values(torch.tensor([[2.], [8.], [0.]]), torch.tensor([[3.], [9.], [0.]]))
-        expected = torch.tensor([[-10 ** 0.5, -10 ** 0.5], [-82 ** 0.5, -82 ** 0.5], [0., 0.]])
+        expected = torch.tensor([[6., 6.], [72., 72.], [0., 0.]])
         torch.testing.assert_close(q, expected)
         self.assertTrue(torch.isfinite(q).all())
 

@@ -21,12 +21,8 @@ def compute_crl_loss(
     Returns:
         スカラーの対照学習損失。
     """
-    # 全組合せの負のユークリッド距離
-    logits = -torch.cdist(
-        sa_embeddings,
-        goal_embeddings,
-        p=2,
-    )
+    # 全組合せの内積
+    logits = sa_embeddings @ goal_embeddings.T
 
     # 対角成分を正例とする
     labels = torch.arange(

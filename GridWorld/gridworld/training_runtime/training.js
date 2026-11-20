@@ -95,12 +95,20 @@ function trainingSettings() {
     value.ppo_hidden_size = Number($('ppo-hidden-size').value);
   }
   if (gragMode()) {
-    const gammaInput = $($('mode').value === 'grag' ? 'hindsight-gamma' : 'crl-gamma').value;
-    const gamma = Number(gammaInput);
-    if (gammaInput.trim() === '' || !Number.isFinite(gamma) || gamma <= 0 || gamma >= 1)
-      throw Error('割引率は0より大きく1未満にしてください。');
-    if ($('mode').value === 'grag') value.hindsight_gamma = gamma;
-    else value.crl_gamma = gamma;
+    if ($('mode').value === 'grag') {
+      const gammaInput = $('hindsight-gamma').value;
+      const gamma = Number(gammaInput);
+      if (gammaInput.trim() === '' || !Number.isFinite(gamma) || gamma <= 0 || gamma >= 1)
+        throw Error('将来ゴール割引率は0より大きく1未満にしてください。');
+      value.hindsight_gamma = gamma;
+    }
+    if ($('mode').value === 'sgcrl') {
+      const gammaInput = $('crl-gamma').value;
+      const gamma = Number(gammaInput);
+      if (gammaInput.trim() === '' || !Number.isFinite(gamma) || gamma <= 0 || gamma >= 1)
+        throw Error('割引率は0より大きく1未満にしてください。');
+      value.crl_gamma = gamma;
+    }
     const learningRate = Number($('crl-learning-rate').value);
     if (!Number.isFinite(learningRate) || learningRate <= 0) throw Error('対照学習の学習率は正の数にしてください。');
     if ($('mode').value === 'grag') value.contrastive_learning_rate = learningRate;
@@ -112,8 +120,11 @@ function trainingSettings() {
     }
   }
   if ($('mode').value === 'grag') {
+    value.grag_device = $('grag-device').value;
     value.grag_update_interval = Number($('grag-update-interval').value);
     if (!integer(value.grag_update_interval, 1, 1000000)) throw Error('更新間隔は1〜1,000,000の整数にしてください。');
+    value.grag_contrastive_epochs = Number($('grag-contrastive-epochs').value);
+    if (!integer(value.grag_contrastive_epochs, 1, 1000)) throw Error('対照学習のエポック数は1〜1000の整数にしてください。');
   }
   if ($('mode').value === 'sgcrl') {
     value.crl_device = $('sgcrl-device').value;
@@ -250,6 +261,12 @@ function drawHeat(map, visits) {
       context.fillText(visits[r][c].toLocaleString(), (c + .5) * unit, (r + .5) * unit, Math.max(1, unit - 8));
     }
   }
+  if (matches(result) && result.mode === 'grag' && valueGoal) {
+    const [r, c] = valueGoal;
+    context.fillStyle = '#078878'; context.beginPath();
+    context.arc((c + .84) * unit, (r + .16) * unit, Math.max(2, unit * .08), 0, Math.PI * 2);
+    context.fill();
+  }
   if (selectedHeatCell && selectedHeatCell.mapName === map.name) {
     context.strokeStyle = '#078878'; context.lineWidth = Math.max(3, unit * .045);
     context.strokeRect(selectedHeatCell.col * unit + 3, selectedHeatCell.row * unit + 3, unit - 6, unit - 6);
@@ -290,7 +307,8 @@ function closePolicyPopup(redraw = true, returnFocus = false) {
 }
 function showPolicyDistribution(data) {
   $('policy-snapshot').textContent = '学習 ' + data.completed_episodes.toLocaleString() + '回 / ' + data.total_steps.toLocaleString() + '行動の時点'
-    + ' · 学習時の選択確率（探索を含む）';
+    + (data.mode === 'grag' ? ' · 目的地 [' + data.selected_goal.join(', ') + '] に対する方策'
+                            : ' · 学習時の選択確率（探索を含む）');
   $('policy-visits').textContent = 'このマス：' + data.visits.toLocaleString() + '訪問';
   $('policy-note').textContent = data.note;
   $('policy-distribution').replaceChildren();
@@ -325,12 +343,17 @@ async function openPolicyCell(row, col, anchor) {
   $('policy-snapshot').textContent = '現在の方策を確認しています…';
   $('policy-distribution').textContent = ''; $('policy-note').textContent = ''; $('policy-visits').textContent = '';
   $('policy-refresh').disabled = true;
+  const map = heatmapMap;
+  const wall = map.obstacles.some(([r, c]) => r === row && c === col);
+  $('policy-set-goal').hidden = !matches(result) || result.mode !== 'grag';
+  $('policy-set-goal').disabled = wall;
   redrawHeat(); positionPolicyPopup();
   if (!matches(result) || !result.session_id) {
     $('policy-snapshot').textContent = '「新しい学習」でAIを準備すると確認できます。';
     positionPolicyPopup(); return;
   }
   const requested = { session_id: result.session_id, mode: result.mode, map_name: result.map.name, position: [row, col] };
+  if (result.mode === 'grag') requested.goal = [...(valueGoal || result.map.goal)];
   try {
     const data = await api('/api/train/policy', requested);
     if (token !== policyRequest || $('policy-popup').hidden) return;
@@ -563,7 +586,7 @@ if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => redrawHeat()
     const ids = { max_steps: 'max-steps', seed: 'seed', discount_factor: 'discount-factor', learning_rate: 'learning-rate',
       epsilon: 'epsilon', epsilon_decay: 'epsilon-decay', min_epsilon: 'min-epsilon', ppo_learning_rate: 'ppo-learning-rate', ppo_hidden_size: 'ppo-hidden-size',
       crl_hidden_size: 'crl-hidden-size', crl_min_replay_size: 'crl-min-replay',
-      grag_update_interval: 'grag-update-interval',
+      grag_update_interval: 'grag-update-interval', grag_contrastive_epochs: 'grag-contrastive-epochs', grag_device: 'grag-device',
       crl_device: 'sgcrl-device', crl_batch_size: 'crl-batch-size', crl_replay_cache_mb: 'crl-cache-mb' };
     for (const [key, id] of Object.entries(cppoFields)) ids['cppo_' + key] = id;
     for (const [key, id] of Object.entries(ids)) if (config[key] !== undefined) $(id).value = config[key] ?? '';
@@ -711,6 +734,25 @@ function openValueCell(row, col, x, y) {
   popup.style.left = Math.max(margin, Math.min(x + 14, window.innerWidth - rect.width - margin)) + 'px';
   popup.style.top = Math.max(margin, Math.min(y + 14, window.innerHeight - rect.height - margin)) + 'px';
 }
+function setDisplayGoal(row, col) {
+  if (!result || !matches(result) || result.mode !== 'grag') return;
+  const map = result.map;
+  if (!integer(row, 0, map.rows - 1) || !integer(col, 0, map.cols - 1) ||
+      map.obstacles.some(([r, c]) => r === row && c === col)) return;
+  $('value-goal-row').value = row; $('value-goal-col').value = col;
+  $('value-goal-error').hidden = true;
+  valueGoal = [row, col]; valueKey = null; valueToken++;
+  redrawHeat();
+  if (selectedHeatCell && !$('policy-popup').hidden)
+    openPolicyCell(selectedHeatCell.row, selectedHeatCell.col, policyAnchor);
+  refreshValueMap();
+}
+$('policy-set-goal').onclick = () => {
+  if (selectedHeatCell) setDisplayGoal(selectedHeatCell.row, selectedHeatCell.col);
+};
+$('value-set-goal').onclick = () => {
+  if (selectedValueCell) setDisplayGoal(selectedValueCell.row, selectedValueCell.col);
+};
 $('value-refresh').onclick = () => refreshValueMap();
 $('value-goal-apply').onclick = () => {
   if (!result || !matches(result)) return;
@@ -721,8 +763,7 @@ $('value-goal-apply').onclick = () => {
     $('value-goal-error').textContent = '障害物でないマップ範囲内の座標を入力してください。';
     $('value-goal-error').hidden = false; return;
   }
-  $('value-goal-error').hidden = true; valueGoal = [row, col]; valueKey = null;
-  refreshValueMap();
+  setDisplayGoal(row, col);
 };
 $('value-goal-reset').onclick = () => {
   if (!result || !matches(result)) return;

@@ -367,7 +367,7 @@ class GRAG:
         goal_repr = self.goal_encoder(goals)
 
         # 4. InfoNCE損失の計算
-        logits = -torch.cdist(sa_repr, goal_repr) # ユークリッド距離を計算
+        logits = sa_repr @ goal_repr.T
 
         episode_ids = episode_ids.to(device)
         labels = torch.arange(len(batch), device=device)
@@ -407,7 +407,7 @@ class GRAG:
         state_actions = torch.cat((all_states, actions.repeat(len(states), 1)), dim=-1)
         state_action_repr = self.sa_encoder(state_actions)
         goal_repr = self.goal_encoder(goals).repeat_interleave(action_count, dim=0)
-        return -torch.linalg.vector_norm(state_action_repr - goal_repr, dim=-1).reshape(-1, action_count)
+        return (state_action_repr * goal_repr).sum(dim=-1).reshape(-1, action_count)
 
     def _update_ppo(self, transitions: list) -> None:
         """対照学習のQ値からadvantageを計算し、PPOでActorを更新する。"""

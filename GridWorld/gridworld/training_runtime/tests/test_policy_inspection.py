@@ -29,6 +29,45 @@ PPO_SETTINGS = {**SETTINGS, "seed": 7, "max_steps": 6, "ppo_hidden_size": 8,
 
 @unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is required")
 class GRAGValueInspectionTests(unittest.TestCase):
+    def test_policy_probabilities_follow_requested_destination(self):
+        import torch
+        session = TrainingSession(MAP, {**PPO_SETTINGS, "grag_device": "cpu"}, GRAGSession)
+        agent = session.agent
+        cells = MAP["rows"] * MAP["cols"]
+        with torch.no_grad():
+            for parameter in agent.actor.parameters():
+                parameter.zero_()
+            agent.actor[1].weight[0, cells + 0] = 2
+            agent.actor[3].weight[0, 0] = 2
+            agent.actor[5].weight[0, 0] = 2
+        first = session.inspect_policy([0, 0], [0, 0])
+        second = session.inspect_policy([0, 0], [1, 0])
+        self.assertEqual(first["selected_goal"], [0, 0])
+        self.assertEqual(second["selected_goal"], [1, 0])
+        self.assertGreater(first["probabilities"]["up"], second["probabilities"]["up"])
+        self.assertEqual(session.world.map["goal"], MAP["goal"])
+
+    def test_policy_goal_changes_observation_without_changing_training_state(self):
+        import torch
+        session = TrainingSession(MAP, {**PPO_SETTINGS, "grag_device": "cpu"}, GRAGSession)
+        agent = session.agent
+        original_map = deepcopy(session.world.map)
+        original_rng = agent._generator.get_state().clone()
+        original_pending = agent.pending
+        goal = [1, 0]
+        position = [0, 0]
+        observation = {**session.world.observation(), "position": position, "goal": goal}
+        expected = agent.action_probabilities(observation)
+        actual = session.inspect_policy(position, goal)
+        self.assertEqual(actual["selected_goal"], goal)
+        self.assertEqual(actual["probabilities"], expected)
+        self.assertEqual(session.world.map, original_map)
+        self.assertIs(agent.pending, original_pending)
+        self.assertTrue(torch.equal(agent._generator.get_state(), original_rng))
+        for invalid in ([0, 1], [-1, 0], [True, 0]):
+            with self.subTest(goal=invalid), self.assertRaises(ValueError):
+                session.inspect_policy(position, invalid)
+
     def test_selected_goal_is_used_by_actor_and_critic_without_changing_session(self):
         import torch
         session = TrainingSession(MAP, PPO_SETTINGS, GRAGSession)
@@ -238,6 +277,23 @@ class PolicyApiTests(unittest.TestCase):
     get = test_api.SessionApiTests.get
     post = test_api.SessionApiTests.post
     wait = test_api.SessionApiTests.wait
+
+    @unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is required")
+    def test_grag_policy_api_uses_selected_goal(self):
+        sid = "c" * 32
+        session = TrainingSession(MAP, {**PPO_SETTINGS, "grag_device": "cpu"}, GRAGSession)
+        training_app.learning_sessions[sid] = {"mode": "grag", "session": session}
+        request = {"session_id": sid, "mode": "grag", "map_name": MAP["name"],
+                   "position": [0, 0], "goal": [1, 0]}
+        before = deepcopy(session.world.map)
+        result = self.post("/api/train/policy", request)
+        expected = session.agent.action_probabilities({**session.world.observation(), "goal": [1, 0]})
+        self.assertEqual(result["selected_goal"], [1, 0])
+        self.assertEqual(result["probabilities"], expected)
+        self.assertEqual(session.world.map, before)
+        with self.assertRaises(HTTPError) as error:
+            self.post("/api/train/policy", {**request, "goal": [0, 1]})
+        self.assertEqual(error.exception.code, 400)
 
     @unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is required")
     def test_grag_value_failure_returns_warning(self):
