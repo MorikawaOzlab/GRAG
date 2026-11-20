@@ -119,9 +119,8 @@ class TrainingSession:
             self.total_steps += 1
             self._episode_reward += reward
             self._episode_collisions += int(collision)
-            if not collision:
-                r, c = next_observation["position"]
-                self.visits[r][c] += 1
+            r, c = next_observation["position"]
+            self.visits[r][c] += 1
             finished = reached_goal or self._episode_steps >= self._episode_limit
             if finished:
                 self.agent.end_episode()

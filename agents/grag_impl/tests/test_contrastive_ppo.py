@@ -20,6 +20,48 @@ class NegativeGoalEncoder(nn.Module):
 
 
 class ContrastivePPOTests(unittest.TestCase):
+    def test_ppo_averages_goal_losses_with_original_transitions(self):
+        agent = GRAG({"seed": 2, "actions": (0, 1), "target_goal_encoder": lambda _: [0.]})
+        agent.initialize_networks(1, 1)
+        states = torch.tensor([[-1.], [0.], [1.]])
+        actions = torch.tensor([0, 1, 0, 0, 1])
+        paired_states = states[[0, 1, 2, 0, 1]]
+        scores = torch.tensor([[2., 1.], [1., 0.], [3., 0.], [-2., 0.], [0., 2.]])
+        with torch.no_grad():
+            logits = agent.actor(paired_states)
+            old_logs = logits.log_softmax(dim=1).gather(1, actions[:, None]).squeeze(1)
+            advantages = scores.gather(1, actions[:, None]).squeeze(1) - (logits.softmax(dim=1) * scores).sum(dim=1)
+            advantages = (advantages - advantages.mean()) / (advantages.std(unbiased=False) + 1e-8)
+            expected_loss = -(advantages[:3].mean() + advantages[3] + advantages[4]) / 3
+        transitions = [dict(state=state, observation=state.tolist(), action=int(action), log_prob=float(log))
+                       for state, action, log in zip(states, actions[:3], old_logs[:3])]
+
+        with patch.object(agent, "q_values", return_value=scores) as q_values, \
+             patch.object(agent.actor_optimizer, "step"):
+            agent._update_ppo(transitions, hindsight_goals=torch.tensor([[1.], [2.], [0.]]))
+
+        torch.testing.assert_close(q_values.call_args.args[1], torch.tensor([[0.], [0.], [0.], [1.], [2.]]))
+        self.assertAlmostEqual(agent.policy_loss, expected_loss.item(), places=6)
+
+    def test_gridworld_critic_and_ppo_share_her_and_actor_sees_relabelled_goal(self):
+        agent = GRAG({"seed": 1, "grag_update_interval": 2})
+        agent.initialize_networks(problem=GridWorldAdapter({"rows": 2, "cols": 2}))
+        obs = {"rows": 2, "cols": 2, "obstacles": [], "goal": [1, 1], "position": [0, 0]}
+        next_obs = {**obs, "position": [0, 1]}
+        action = agent.choose_action(obs)
+        agent.learn(obs, action, 0, next_obs, False)
+        action = agent.choose_action(next_obs)
+
+        with patch.object(agent, "_sample_hindsight_goals", return_value=torch.tensor([[0., 1.], [1., 1.]])) as sample, \
+             patch.object(agent.actor, "forward", wraps=agent.actor.forward) as actor:
+            agent.learn(next_obs, action, 1, {**obs, "position": [1, 1]}, True)
+
+        sample.assert_called_once()
+        actor_goals = actor.call_args_list[0].args[0].reshape(-1, 3, 2, 2)[:, 1].flatten(1).argmax(dim=1)
+        self.assertEqual(actor_goals.tolist(), [3, 3, 1])
+        self.assertIsNotNone(agent.contrastive_loss)
+        self.assertIsNotNone(agent.policy_loss)
+
     def test_advantages_are_computed_before_any_minibatch_update(self):
         agent = GRAG({"seed": 7, "grag_update_interval": 4, "cppo_batch_size": 2,
                       "target_goal_encoder": lambda obs: [0.]})

@@ -8,6 +8,30 @@ from agents.grag_impl.gridworld_adapter import GridWorldAdapter
 
 
 class ContrastiveUpdateTests(unittest.TestCase):
+    def test_goal_groups_average_losses_and_update_once_within_one_episode(self):
+        agent = GRAG({"seed": 1, "actions": (0, 1)})
+        agent.initialize_networks(1, 1)
+        batch = [
+            {"state": torch.tensor([float(i)]), "action": i % 2, "episode_id": 0,
+             "next_state": torch.tensor([goal])}
+            for i, goal in ((0, 1.), (1, 2.), (0, 2.), (2, 3.))
+        ]
+        reference = next(agent.sa_encoder.parameters())
+        sa = torch.tensor([[0., 1., 0.], [1., 0., 1.], [2., 1., 0.]]).to(reference)
+        unique_goals = torch.tensor([[1.], [2.], [3.]]).to(reference)
+        with torch.no_grad():
+            logits = -torch.cdist(agent.goal_encoder(unique_goals), agent.sa_encoder(sa))
+            log_probs = logits.log_softmax(dim=1)
+            expected_loss = -(log_probs[0, 0] + log_probs[1, :2].mean() + log_probs[2, 2]) / 3
+
+        with patch("torch.multinomial", return_value=torch.tensor([0])):
+            with patch.object(agent.contrastive_optimizer, "step", wraps=agent.contrastive_optimizer.step) as step:
+                self.assertTrue(agent._update_contrastive(batch))
+                self.assertEqual(step.call_count, 1)
+
+        self.assertAlmostEqual(agent.contrastive_loss, expected_loss.item(), places=6)
+        self.assertEqual(agent._contrastive_pending, [])
+
     def test_contrastive_epochs_reuse_immediate_goal(self):
         agent = GRAG({"seed": 1, "actions": (0, 1), "grag_contrastive_epochs": 3})
         agent.initialize_networks(1, 1)
@@ -60,16 +84,12 @@ class ContrastiveUpdateTests(unittest.TestCase):
                   "next_state": torch.tensor([3.])},
                  {"episode_id": 1, "state": torch.tensor([2.]), "action": 1,
                   "next_state": torch.tensor([4.])}]
-        goals = torch.tensor([[3.], [4.]], device=next(agent.sa_encoder.parameters()).device)
-        inputs = torch.tensor([[1., 1., 0.], [2., 0., 1.]], device=next(agent.sa_encoder.parameters()).device)
-        with torch.no_grad():
-            sa = agent.sa_encoder(inputs)
-            goal = agent.goal_encoder(goals)
-            expected = sa @ goal.T
-        original_loss = torch.nn.functional.cross_entropy
-        with patch("agents.grag_impl.grag.F.cross_entropy", wraps=original_loss) as loss:
+        with patch.object(agent.sa_encoder, "forward", wraps=agent.sa_encoder.forward) as sa_forward, \
+             patch.object(agent.goal_encoder, "forward", wraps=agent.goal_encoder.forward) as goal_forward:
             self.assertTrue(agent._update_contrastive(batch))
-        torch.testing.assert_close(loss.call_args.args[0], expected)
+        self.assertEqual(sa_forward.call_count, 1)
+        self.assertEqual(goal_forward.call_count, 1)
+        self.assertTrue(torch.isfinite(torch.tensor(agent.contrastive_loss)))
 
     def test_hindsight_samples_future_within_episode(self):
         agent = GRAG({"seed": 1, "hindsight_gamma": 0.5})
@@ -82,19 +102,21 @@ class ContrastiveUpdateTests(unittest.TestCase):
         ]
         weights_seen = []
 
-        def choose_last(weights, num_samples, generator):
+        def choose_last(weights, num_samples, replacement, generator):
             weights_seen.append(weights.clone())
-            return torch.tensor([len(weights) - 1])
+            return torch.arange(len(weights) - 1, len(weights) - num_samples - 1, -1)
 
         with patch("torch.multinomial", side_effect=choose_last):
-            goals = agent._sample_hindsight_goals(transitions)
-        self.assertEqual(goals.flatten().tolist(), [2., 2., 11., 11.])
-        self.assertTrue(torch.equal(weights_seen[0], torch.tensor([1., 0.5])))
-        self.assertTrue(torch.equal(weights_seen[1], torch.tensor([1.])))
+            goals, owners = agent._sample_hindsight_goals(transitions)
+        self.assertEqual(goals.flatten().tolist(), [2., 1., 2., 11., 10., 11.])
+        self.assertEqual(owners.tolist(), [0, 0, 1, 2, 2, 3])
+        torch.testing.assert_close(weights_seen[0], torch.tensor([1., 0.5], dtype=torch.float64))
+        torch.testing.assert_close(weights_seen[1], torch.tensor([1.], dtype=torch.float64))
 
-    def test_updates_encoders_when_another_episode_supplies_negatives(self):
+    def test_updates_encoders_when_another_goal_supplies_negatives(self):
         agent = GRAG({"seed": 42})
         agent.UPDATE_INTERVAL = 2
+        agent.INITIAL_COLLECTION_STEPS = 2
         agent.initialize_networks(problem=GridWorldAdapter({"rows": 2, "cols": 2}))
 
         def observation(position):

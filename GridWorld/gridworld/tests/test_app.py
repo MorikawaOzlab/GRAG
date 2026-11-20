@@ -98,7 +98,7 @@ class AppTests(unittest.TestCase):
         self.assertTrue(collision)
         settings = {**storage.DEFAULT_SETTINGS, "episodes": 1, "max_steps": 4}
         result = train(MAP, settings, PlannedAgent)
-        self.assertEqual(result["visits"], [[0, 0, 0], [1, 1, 1]])
+        self.assertEqual(result["visits"], [[1, 0, 0], [1, 1, 1]])
         self.assertEqual(result["successes"], 1)
         self.assertEqual(result["total_reward"], 1)
         self.assertEqual(result["history"][0]["reward"], 1)
@@ -114,7 +114,7 @@ class AppTests(unittest.TestCase):
         self.assertEqual(result["total_reward"], 0)
         self.assertTrue(all(item["reward"] == 0 and item["cumulative_reward"] == 0
                             for item in result["history"]))
-        self.assertEqual(result["visits"], [[0, 0], [0, 0]])
+        self.assertEqual(result["visits"], [[15, 0], [0, 0]])
         self.assertEqual(len(result["frames"]), 6)
 
     def test_http_file_flow(self):

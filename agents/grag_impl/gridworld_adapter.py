@@ -34,3 +34,7 @@ class GridWorldAdapter:
     def encode_goal(self, observation: dict) -> torch.Tensor:
         """観測で指定された目標位置を返す。"""
         return torch.tensor(observation["goal"], dtype=torch.float32)
+
+    def relabel_goal(self, observation: dict, goal: torch.Tensor) -> dict:
+        """Actorに渡す観測の目標をHERで選んだ位置に差し替える。"""
+        return {**observation, "goal": [int(coordinate) for coordinate in goal]}

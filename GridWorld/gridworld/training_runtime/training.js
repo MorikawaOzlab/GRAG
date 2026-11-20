@@ -490,6 +490,21 @@ async function poll() {
   } catch (error) { if (initialized && !programStopped) message('接続を確認しています… ' + error.message, true); }
   finally { if (!programStopped) setTimeout(poll, job?.status === 'paused' ? 250 : 150); }
 }
+const batchEpisodesInput = $('batch-episodes');
+const batchEpisodesStorageKey = 'gridworld.training.batchEpisodes';
+try {
+  const savedCount = Number(localStorage.getItem(batchEpisodesStorageKey));
+  if (integer(savedCount, 1, 1000000)) batchEpisodesInput.value = String(savedCount);
+} catch (_) { /* Storage can be unavailable in some browser sessions. */ }
+
+batchEpisodesInput.oninput = () => {
+  const count = Number(batchEpisodesInput.value);
+  if (integer(count, 1, 1000000)) {
+    try { localStorage.setItem(batchEpisodesStorageKey, String(count)); }
+    catch (_) { /* The number is still usable for the current page. */ }
+  }
+  syncControls();
+};
 syncControls();
 $('restart-program').onclick = async () => {
   if (!confirm('再起動すると実行中の学習は終了します。再起動しますか？')) return;
@@ -533,7 +548,6 @@ $('observe-training').onclick = () => action('observe');
 $('pause-training').onclick = () => action('pause');
 $('skip-training').onclick = () => action('skip');
 $('stop-fast').onclick = () => action('stop-fast');
-$('batch-episodes').oninput = syncControls;
 $('map-list').onchange = () => chooseMap().catch(error => message(error.message, true));
 $('mode').onchange = () => { syncControls(); chooseMap().catch(error => message(error.message, true)); };
 $('observation-speed').onchange = () => { if (interactive()) control('speed', { step_delay_ms: Number($('observation-speed').value) }).catch(error => message(error.message, true)); };
