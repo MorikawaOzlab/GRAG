@@ -32,6 +32,15 @@ class GRAG:
         self.actions = tuple(settings.get("actions", ACTIONS))
         if not self.actions:
             raise ValueError("actionsには1つ以上の行動を指定してください。")
+        self.epsilon = settings.get("epsilon", 0.0)
+        self.epsilon_decay = settings.get("epsilon_decay", 1.0)
+        self.min_epsilon = settings.get("min_epsilon", 0.0)
+        for name in ("epsilon", "epsilon_decay", "min_epsilon"):
+            value = getattr(self, name)
+            if type(value) not in (int, float) or not 0 <= value <= 1:
+                raise ValueError(f"{name}は0〜1の数値にしてください。")
+        if self.min_epsilon > self.epsilon:
+            raise ValueError("min_epsilonはepsilon以下にしてください。")
         self.observation_encoder = settings.get("observation_encoder")
         if self.observation_encoder is not None and not callable(self.observation_encoder):
             raise ValueError("observation_encoderは呼び出し可能にしてください。")
@@ -41,7 +50,6 @@ class GRAG:
         self.target_goal_encoder = settings.get("target_goal_encoder")
         if self.target_goal_encoder is not None and not callable(self.target_goal_encoder):
             raise ValueError("target_goal_encoderは呼び出し可能にしてください。")
-        self.relabel_goal = None
         self.contrastive_learning_rate = settings.get("contrastive_learning_rate", 3e-4)
         if (isinstance(self.contrastive_learning_rate, bool)
                 or not isinstance(self.contrastive_learning_rate, (int, float))
@@ -62,7 +70,7 @@ class GRAG:
         self.actor_optimizer = None
         self.policy_loss = None
         self.contrastive_loss = None
-        self._contrastive_pending = []  # 目標ごとの負例が揃うまで保持
+        self._contrastive_pending = []  # 異なるエピソードの負例が揃うまで保持
         self._network_spec = None
         self.episodes = []    # 終了したエピソードの軌跡
         self.trajectory = []  # 現在のエピソードの遷移
@@ -104,9 +112,6 @@ class GRAG:
             target_encoder = getattr(problem, "encode_goal", self.target_goal_encoder)
             if target_encoder is not None and not callable(target_encoder):
                 raise ValueError("encode_goalは呼び出し可能にしてください。")
-            relabel_goal = getattr(problem, "relabel_goal", None)
-            if relabel_goal is not None and not callable(relabel_goal):
-                raise ValueError("relabel_goalは呼び出し可能にしてください。")
         if action_dim is None:
             action_dim = len(self.actions)
         if any(type(n) is not int or n <= 0 for n in (state_dim, goal_dim, action_dim)):
@@ -121,7 +126,6 @@ class GRAG:
                 self.observation_encoder = problem.encode_observation
                 self.achieved_goal_encoder = goal_encoder
                 self.target_goal_encoder = target_encoder
-                self.relabel_goal = relabel_goal
             return
         repr_dim = 64
 
@@ -161,7 +165,6 @@ class GRAG:
             self.observation_encoder = problem.encode_observation
             self.achieved_goal_encoder = goal_encoder
             self.target_goal_encoder = target_encoder
-            self.relabel_goal = relabel_goal
 
     def initialize_for_gridworld(self, map_data: dict) -> None:
         """GridWorldのマップから特徴次元を決める。"""
@@ -194,8 +197,15 @@ class GRAG:
                 raise ValueError("Actorの出力は有限の数値にしてください。")
             return logits
 
+    @staticmethod
+    def _exploration_log_probs(logits: torch.Tensor, epsilon: torch.Tensor) -> torch.Tensor:
+        """Actorと一様探索を混合した行動分布の対数確率。"""
+        actor = F.log_softmax(logits, dim=-1) + torch.log1p(-epsilon)
+        uniform = epsilon.log() - math.log(logits.shape[-1])
+        return torch.logaddexp(actor, uniform)
+
     def choose_action(self, observation, greedy: bool = False):
-        """観測から行動を選ぶ。greedy=Trueでは最大確率の行動を返す。"""
+        """学習時はε探索を混ぜ、評価時はActorの最大確率の行動を返す。"""
         
         if not greedy and self.pending is not None:
             raise RuntimeError("次の行動選択前にlearn()を呼んでください。")
@@ -207,21 +217,22 @@ class GRAG:
             if greedy:
                 action = logits.argmax().item()
             else:
-                probabilities = torch.softmax(logits, dim=-1).cpu()
-                action = torch.multinomial(probabilities, 1, generator=self._generator).item()
+                log_probs = self._exploration_log_probs(logits, logits.new_tensor(self.epsilon))
+                action = torch.multinomial(log_probs.exp().cpu(), 1, generator=self._generator).item()
 
                 # learnメソッドで学習用にメモリに記録するための一時保存
                 self.pending = {
                     "observation": deepcopy(observation),
                     "state": state,
                     "action": action,  # actions内のインデックス
-                    "log_prob": float(torch.log_softmax(logits, dim=-1)[action].item()),
+                    "log_prob": float(log_probs[action].item()),
+                    "epsilon": self.epsilon,
                 }
 
         return self.actions[action]
 
     def action_probabilities(self, observation) -> dict:
-        """各行動の選択確率を返す。Actorの初期化と乱数の消費は行わない。"""
+        """評価用にActorの行動確率を返す。乱数は消費しない。"""
         try:
             if len(set(self.actions)) != len(self.actions):
                 raise ValueError("行動確率の取得には重複しないactionsが必要です。")
@@ -266,6 +277,7 @@ class GRAG:
             self.episodes.append(self.trajectory)
             self.trajectory = []
             self._episode_id += 1
+            self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
 
     #===============
@@ -273,13 +285,10 @@ class GRAG:
     #===============
 
     def _update_networks(self, transitions: list) -> None:
-        """同じ経験とHER目標を対照学習とPPOに使う。"""
-        batch = self._contrastive_pending + transitions
-        if not batch:
-            return
-        hindsight_goals = self._sample_hindsight_goals(batch)
-        if self._update_contrastive(transitions, hindsight_goals=hindsight_goals):
-            self._update_ppo(batch, hindsight_goals=hindsight_goals)
+        """収集した経験を対照学習とPPOの更新に渡す。"""
+        # CPPOと同様、更新前のCriticでadvantageを計算してActor更新中は固定する。
+        if self._update_contrastive(transitions):
+            self._update_ppo(transitions)
 
     def _sample_hindsight_goals(self, transitions: list) -> torch.Tensor:
         """各遷移から、同一エピソード内の将来の到達ゴールを選択する。"""
@@ -333,22 +342,17 @@ class GRAG:
 
         return torch.stack(future_goals)
 
-    @staticmethod
-    def _goal_infonce_loss(logits: torch.Tensor, positives: torch.Tensor) -> torch.Tensor:
-        """各行の目標を固定したInfoNCEを計算し、目標間で平均する。"""
-        log_probs = F.log_softmax(logits, dim=1)
-        positive_log_probs = log_probs.masked_fill(~positives, 0)
-        goal_losses = -positive_log_probs.sum(dim=1) / positives.sum(dim=1)
-        return goal_losses.mean()
-
-    def _update_contrastive(self, transitions: list, *, hindsight_goals: torch.Tensor | None = None) -> bool:
+    def _update_contrastive(self, transitions: list) -> bool:
         """InfoNCEで更新できた場合にTrueを返す。"""
 
         # 1. 経験の蓄積
         self._contrastive_pending.extend(transitions)
         batch = self._contrastive_pending
 
-        if not batch:
+        episode_ids = torch.tensor([t["episode_id"] for t in batch])
+
+        # 異なるエピソードが2つ以上必要
+        if episode_ids.unique().numel() < 2:
             self.contrastive_loss = None
             return False
 
@@ -356,7 +360,7 @@ class GRAG:
         reference = next(self.sa_encoder.parameters()) # エンコーダの１番目の学習対象パラメータ
         device = reference.device
 
-        # バッチから各遷移の状態・行動を取り出す。
+        # バッチからデータを取り出す．各エピソードを1次元で管理する
         # エンコーダのパラメータと同じデータ型，デバイスにそろえる
         states = torch.stack([
             t["state"].reshape(-1) for t in batch
@@ -371,48 +375,32 @@ class GRAG:
             actions, num_classes=len(self.actions)
         ).to(reference)
 
-        # 3. HERの目標ごとに正例の状態・行動をまとめる。
-        if hindsight_goals is None:
-            hindsight_goals = self._sample_hindsight_goals(batch)
-        goals = hindsight_goals.to(reference)
-        unique_goals, goal_indices = torch.unique(
-            goals, dim=0, return_inverse=True
-        )
+        # HERを適用
+        goals = self._sample_hindsight_goals(batch).to(reference)
 
+        # 3. エンコード
         sa_inputs = torch.cat([states, actions], dim=-1)
-        unique_sa, sa_indices = torch.unique(
-            sa_inputs, dim=0, return_inverse=True
-        )
 
-        # 目標と状態・行動の正例関係を作成
-        positives = torch.zeros(
-            (len(unique_goals), len(unique_sa)),
-            dtype=torch.bool,
-            device=device
-        )
-        positives[goal_indices, sa_indices] = True
+        sa_repr = self.sa_encoder(sa_inputs)
+        goal_repr = self.goal_encoder(goals)
 
-        # 正例と負例の両方が存在する目標だけを使用
-        has_positives = positives.any(dim=1)
-        has_negatives = (~positives).any(dim=1)
-        valid_goals = has_positives & has_negatives
+        # 4. InfoNCE損失の計算
+        logits = -torch.cdist(sa_repr, goal_repr) # ユークリッド距離を計算
 
-        if not valid_goals.any():
-            self.contrastive_loss = None
-            return False
+        episode_ids = episode_ids.to(device)
+        labels = torch.arange(len(batch), device=device)
 
-        # 4. 目標ごとに複数正例InfoNCEを計算する。
-        sa_repr = self.sa_encoder(unique_sa)
-        goal_repr = self.goal_encoder(unique_goals[valid_goals])
+        # 正例を用意 : 同一エピソード内の他の経験を負例から除外
+        allowed = episode_ids[:, None] != episode_ids[None, :]
+        allowed[labels, labels] = True
 
-        logits = -torch.cdist(goal_repr, sa_repr)
+        # 1対1対応の(s, a)とg (HERで割り当てた) を行と列とし，対角線を正例，それ以外を負例とする
+        logits = logits.masked_fill(~allowed, -torch.inf)
 
-        loss = self._goal_infonce_loss(
-            logits,
-            positives[valid_goals]
-        )
+        # すべての正例に対する損失を計算
+        loss = F.cross_entropy(logits, labels) # InfoNCE Loss
 
-        # 5. 目標間の平均損失でエンコーダを更新する。
+        # 5. パラメータ更新
         self.contrastive_optimizer.zero_grad()
         loss.backward()
 
@@ -420,12 +408,11 @@ class GRAG:
             list(self.sa_encoder.parameters())
             + list(self.goal_encoder.parameters())
         )
-
         nn.utils.clip_grad_norm_(parameters, max_norm=0.5)
+
         self.contrastive_optimizer.step()
 
-
-
+        # 学習結果の保存と経験の初期化
         self.contrastive_loss = loss.detach().item()
         self._contrastive_pending = []
         return True
@@ -443,13 +430,14 @@ class GRAG:
         goal_repr = self.goal_encoder(goals).repeat_interleave(action_count, dim=0)
         return -torch.linalg.vector_norm(state_action_repr - goal_repr, dim=-1).reshape(-1, action_count)
 
-    def _update_ppo(self, transitions: list, *, hindsight_goals: torch.Tensor | None = None) -> None:
-        """元の目標とHER目標ごとのPPO損失を平均してActorを更新する。"""
+    def _update_ppo(self, transitions: list) -> None:
+        """対照学習のQ値からadvantageを計算し、PPOでActorを更新する。"""
         reference = next(self.actor.parameters())
         states = torch.stack([row["state"].reshape(-1) for row in transitions]).to(reference)
         actions = torch.tensor([row["action"] for row in transitions], device=reference.device)
         old_log_probs = torch.tensor([row["log_prob"] for row in transitions],
                                      dtype=reference.dtype, device=reference.device)
+        epsilons = reference.new_tensor([row.get("epsilon", 0.0) for row in transitions]).unsqueeze(1)
         goals = []
         for row in transitions:
             goal = (self.target_goal_encoder(row["observation"])
@@ -460,43 +448,21 @@ class GRAG:
             goals.append(goal)
         goals = torch.stack(goals).to(reference)
 
-        actor_states = states
-        if hindsight_goals is not None:
-            hindsight_goals = hindsight_goals.to(reference)
-            relabeled = (hindsight_goals != goals).any(dim=1).nonzero(as_tuple=True)[0]
-            if relabeled.numel():
-                relabeled_goals = hindsight_goals[relabeled]
-                relabeled_states = states[relabeled]
-                if self.relabel_goal is not None:
-                    relabeled_states = torch.stack([
-                        self._prepare_state(self.relabel_goal(transitions[index]["observation"], goal)).reshape(-1)
-                        for index, goal in zip(relabeled.tolist(), relabeled_goals.cpu())
-                    ]).to(reference)
-                actor_states = torch.cat([states, relabeled_states])
-                # Criticは収集時の状態表現とHER目標の組を学習する。
-                states = torch.cat([states, states[relabeled]])
-                goals = torch.cat([goals, relabeled_goals])
-                actions = torch.cat([actions, actions[relabeled]])
-                old_log_probs = torch.cat([old_log_probs, old_log_probs[relabeled]])
-
-        # 各目標内で平均し、遷移数によらず各目標を等しく扱う。
-        _, goal_ids, goal_counts = torch.unique(goals, dim=0, return_inverse=True, return_counts=True)
-        sample_weights = (goal_counts[goal_ids].to(reference) * len(goal_counts)).reciprocal()
-
         with torch.no_grad():
             q_values = self.q_values(states, goals)
-            probabilities = torch.softmax(self.actor(actor_states), dim=-1)
+            probabilities = self._exploration_log_probs(self.actor(states), epsilons).exp()
             baseline = (probabilities * q_values).sum(dim=-1)
             advantages = q_values.gather(1, actions[:, None]).squeeze(1) - baseline
-            if len(goals) > 1:
+            if len(transitions) > 1:
                 advantages = (advantages - advantages.mean()) / (advantages.std(unbiased=False) + 1e-8)
 
         for _ in range(4):
-            distribution = torch.distributions.Categorical(logits=self.actor(actor_states))
+            log_probs = self._exploration_log_probs(self.actor(states), epsilons)
+            distribution = torch.distributions.Categorical(logits=log_probs)
             ratio = (distribution.log_prob(actions) - old_log_probs).exp()
             clipped_ratio = ratio.clamp(0.8, 1.2)
-            policy_loss = -(sample_weights * torch.minimum(ratio * advantages, clipped_ratio * advantages)).sum()
-            loss = policy_loss - 0.01 * (sample_weights * distribution.entropy()).sum()
+            policy_loss = -torch.minimum(ratio * advantages, clipped_ratio * advantages).mean()
+            loss = policy_loss - 0.01 * distribution.entropy().mean()
             self.actor_optimizer.zero_grad()
             loss.backward()
             nn.utils.clip_grad_norm_(self.actor.parameters(), 0.5)
