@@ -17,6 +17,6 @@ ollama pull gpt-oss:20b
 
 ## 既存GridWorld
 
-`GridWorld/scripts/training_app.bat`、`map_app.bat`、`settings_app.bat` で起動します。
+`GridWorld/scripts/training_app.bat` で、AI学習・マップ作成・設定の3つを起動します。
 既存データは `GridWorld/data/` に移動しています。
 仮想環境はルートの `venv/` を継続使用します。

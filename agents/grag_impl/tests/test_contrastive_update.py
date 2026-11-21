@@ -32,16 +32,18 @@ class ContrastiveUpdateTests(unittest.TestCase):
         self.assertAlmostEqual(agent.contrastive_loss, expected_loss.item(), places=6)
         self.assertEqual(agent._contrastive_pending, [])
 
-    def test_contrastive_epochs_reuse_immediate_goal(self):
+    def test_contrastive_epochs_reuse_sampled_goals(self):
         agent = GRAG({"seed": 1, "actions": (0, 1), "grag_contrastive_epochs": 3})
         agent.initialize_networks(1, 1)
         batch = [{"episode_id": 0, "state": torch.tensor([1.]), "action": 0,
                   "next_state": torch.tensor([3.])},
-                 {"episode_id": 0, "state": torch.tensor([2.]), "action": 1,
+                 {"episode_id": 1, "state": torch.tensor([2.]), "action": 1,
                   "next_state": torch.tensor([4.])}]
-        with patch.object(agent.goal_encoder, "forward", wraps=agent.goal_encoder.forward) as encode, \
+        with patch.object(agent, "_sample_hindsight_goals", wraps=agent._sample_hindsight_goals) as sample, \
+             patch.object(agent.goal_encoder, "forward", wraps=agent.goal_encoder.forward) as encode, \
              patch.object(agent.contrastive_optimizer, "step", wraps=agent.contrastive_optimizer.step) as step:
             self.assertTrue(agent._update_contrastive(batch))
+        sample.assert_called_once()
         self.assertEqual([call.args[0][:, 0].tolist() for call in encode.call_args_list], [[3., 4.]] * 3)
         self.assertEqual(step.call_count, 3)
 

@@ -7,6 +7,7 @@ from threading import RLock
 from time import perf_counter
 
 from agents.q_learning import ACTIONS, QLearningAgent
+from gridworld.storage import validate_map
 from gridworld.world import GridWorld
 
 
@@ -41,6 +42,7 @@ class TrainingSession:
 
     def __init__(self, map_data: dict, settings: dict, agent_type=QLearningAgent):
         self.world = GridWorld(deepcopy(map_data))
+        self.source_goal = self.world.map["goal"].copy()
         self.settings = deepcopy(settings)
         self.agent = agent_type(deepcopy(self.settings))
         initialize = getattr(self.agent, "initialize_for_gridworld", None)
@@ -76,6 +78,36 @@ class TrainingSession:
             raise ValueError("最大行動回数は1〜1,000,000の整数にしてください。")
         with self._lock:
             self.settings["max_steps"] = value
+
+    def set_contrastive_epochs(self, value: int) -> None:
+        with self._lock:
+            self.agent.contrastive_epochs = value
+            self.settings["grag_contrastive_epochs"] = value
+
+    def validate_goal(self, goal) -> None:
+        validate_map({**self.world.map, "goal": goal})
+
+    def set_goal(self, goal: list[int]) -> bool:
+        with self._lock:
+            self.validate_goal(goal)
+            if goal == self.world.map["goal"]:
+                return False
+            if self._observation is not None:
+                self.agent.end_episode()
+            set_goal = getattr(self.agent, "set_gridworld_goal", None)
+            if callable(set_goal):
+                set_goal(goal)
+            self.world.map["goal"] = goal.copy()
+            self.world.reset()
+            self._observation = None
+            self._episode_steps = self._episode_reward = self._episode_collisions = 0
+            self.visits = [[0] * self.world.map["cols"] for _ in range(self.world.map["rows"])]
+            self.live = {"episode": self.completed_episodes + 1, "step": 0,
+                         "position": list(self.world.position), "action": None,
+                         "collision": False, "reached_goal": False, "finished": False,
+                         "completed_episodes": self.completed_episodes, "total_steps": self.total_steps,
+                         "max_steps": self.settings["max_steps"]}
+            return True
 
     def step(self) -> dict:
         """実際の行動選択・環境遷移・学習を1回行う。途中で停止・再開できる。"""
@@ -288,7 +320,14 @@ class TrainingSession:
                 "workers_used": 1, "batch_episodes": self.last_batch_episodes,
                 "q_table": None if compact or (checkpoint and getattr(
                     self.agent, "CHECKPOINT_INCLUDES_MODEL", False)) else self.agent.export()}
+            positive_goal_counts = getattr(self.agent, "cumulative_positive_goal_counts", None)
+            if positive_goal_counts:
+                result["cumulative_positive_goal_counts"] = [
+                    {"goal": list(goal), "count": count}
+                    for goal, count in sorted(positive_goal_counts.items())
+                ]
             if checkpoint:
+                result["source_goal"] = self.source_goal.copy()
                 save = getattr(self.agent, "checkpoint", None)
                 result["agent_checkpoint"] = save() if callable(save) else None
                 result["recent_rewards"] = list(self._recent)
@@ -307,6 +346,7 @@ class TrainingSession:
         if result.get("agent_checkpoint") is None or not callable(load):
             raise ValueError("この学習器はアプリ再起動後の続行に対応していません。")
         load(result["agent_checkpoint"])
+        session.source_goal = list(result.get("source_goal", session.source_goal))
         session.history = deepcopy(result["history"])
         session.completed_episodes = result.get("completed_episodes", result["settings"]["episodes"])
         session.total_steps = result.get("total_steps", sum(item["steps"] for item in session.history))

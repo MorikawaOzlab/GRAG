@@ -29,6 +29,31 @@ PPO_SETTINGS = {**SETTINGS, "seed": 7, "max_steps": 6, "ppo_hidden_size": 8,
 
 @unittest.skipUnless(TORCH_AVAILABLE, "PyTorch is required")
 class GRAGValueInspectionTests(unittest.TestCase):
+    def test_training_snapshot_accumulates_her_positives_once_per_batch_by_goal(self):
+        import torch
+
+        session = TrainingSession(MAP, {**PPO_SETTINGS, "grag_contrastive_epochs": 2}, GRAGSession)
+        agent = session.agent
+        self.assertNotIn("cumulative_positive_goal_counts", session.result(compact=True))
+        state = agent._prepare_state(session.world.observation())
+        batch = [{"episode_id": i, "state": state, "action": i} for i in range(3)]
+        goals = torch.tensor([[1., 0.], [1., 0.], [1., 2.]])
+        with patch.object(agent, "_sample_hindsight_goals", return_value=goals):
+            self.assertTrue(agent._update_contrastive(batch))
+        self.assertEqual(session.result(compact=True)["cumulative_positive_goal_counts"], [
+            {"goal": [1, 0], "count": 2}, {"goal": [1, 2], "count": 1},
+        ])
+        self.assertFalse(agent._update_contrastive(batch[:1]))
+        self.assertEqual(session.result(compact=True)["cumulative_positive_goal_counts"], [
+            {"goal": [1, 0], "count": 2}, {"goal": [1, 2], "count": 1},
+        ])
+        next_goals = torch.tensor([[1., 0.], [0., 0.]])
+        with patch.object(agent, "_sample_hindsight_goals", return_value=next_goals):
+            self.assertTrue(agent._update_contrastive(batch[1:2]))
+        self.assertEqual(session.result(checkpoint=True)["cumulative_positive_goal_counts"], [
+            {"goal": [0, 0], "count": 1}, {"goal": [1, 0], "count": 3}, {"goal": [1, 2], "count": 1},
+        ])
+
     def test_policy_probabilities_follow_requested_destination(self):
         import torch
         session = TrainingSession(MAP, {**PPO_SETTINGS, "grag_device": "cpu"}, GRAGSession)

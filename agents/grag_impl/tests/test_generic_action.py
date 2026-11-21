@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 import torch
 
@@ -7,6 +8,32 @@ from agents.grag_impl.gridworld_adapter import GridWorldAdapter
 
 
 class GenericActionTests(unittest.TestCase):
+    def test_choose_action_switches_between_uniform_exploration_and_actor(self):
+        agent = GRAG({"seed": 7, "actions": (10, 20, 30), "epsilon": 0.25})
+        agent.initialize_networks(1, 1)
+        logits = torch.tensor([0., 1., 2.])
+        actor_probabilities = logits.softmax(dim=0)
+        behavior_probabilities = 0.75 * actor_probabilities + 0.25 / 3
+        observation = [0.]
+        for draw, expected_action in ((0.1, 10), (0.8, 30)):
+            with self.subTest(draw=draw), \
+                 patch.object(agent, "_action_logits", return_value=logits), \
+                 patch("torch.rand", return_value=torch.tensor(draw)), \
+                 patch("torch.randint", return_value=torch.tensor(0)) as uniform, \
+                 patch("torch.multinomial", return_value=torch.tensor([2])) as actor:
+                action = agent.choose_action(observation)
+
+            self.assertEqual(action, expected_action)
+            if draw < agent.epsilon:
+                uniform.assert_called_once_with(3, (), generator=agent._generator)
+                actor.assert_not_called()
+            else:
+                uniform.assert_not_called()
+                torch.testing.assert_close(actor.call_args.args[0], actor_probabilities)
+            expected_log_prob = behavior_probabilities[agent.actions.index(action)].log().item()
+            self.assertAlmostEqual(agent.pending["log_prob"], expected_log_prob, places=6)
+            agent.learn(observation, action, 0, observation, False)
+
     def test_custom_observation_and_actions(self):
         agent = GRAG({"seed": 7, "actions": (10, 20, 30),
                       "observation_encoder": lambda obs: [obs["x"], obs["velocity"]]})

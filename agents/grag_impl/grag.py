@@ -29,6 +29,7 @@ class GRAG:
         self.UPDATE_INTERVAL = settings.get("grag_update_interval", self.UPDATE_INTERVAL)
         if type(self.UPDATE_INTERVAL) is not int or not 1 <= self.UPDATE_INTERVAL <= 1_000_000:
             raise ValueError("grag_update_intervalは1〜1,000,000の整数にしてください。")
+        self.contrastive_epochs = settings.get("grag_contrastive_epochs", 1)
         self.actions = tuple(settings.get("actions", ACTIONS))
         if not self.actions:
             raise ValueError("actionsには1つ以上の行動を指定してください。")
@@ -70,6 +71,7 @@ class GRAG:
         self.actor_optimizer = None
         self.policy_loss = None
         self.contrastive_loss = None
+        self.cumulative_positive_goal_counts: dict[tuple[float, ...], int] = {}
         self._contrastive_pending = []  # 異なるエピソードの負例が揃うまで保持
         self._network_spec = None
         self.episodes = []    # 終了したエピソードの軌跡
@@ -376,17 +378,11 @@ class GRAG:
         ).to(reference)
 
         # HERを適用
-        goals = self._sample_hindsight_goals(batch).to(reference)
+        hindsight_goals = self._sample_hindsight_goals(batch)
+        goals = hindsight_goals.to(reference)
 
-        # 3. エンコード
+        # 3. 同じHER目標と正例・負例の組を全エポックで使う。
         sa_inputs = torch.cat([states, actions], dim=-1)
-
-        sa_repr = self.sa_encoder(sa_inputs)
-        goal_repr = self.goal_encoder(goals)
-
-        # 4. InfoNCE損失の計算
-        logits = -torch.cdist(sa_repr, goal_repr) # ユークリッド距離を計算
-
         episode_ids = episode_ids.to(device)
         labels = torch.arange(len(batch), device=device)
 
@@ -394,25 +390,26 @@ class GRAG:
         allowed = episode_ids[:, None] != episode_ids[None, :]
         allowed[labels, labels] = True
 
-        # 1対1対応の(s, a)とg (HERで割り当てた) を行と列とし，対角線を正例，それ以外を負例とする
-        logits = logits.masked_fill(~allowed, -torch.inf)
-
-        # すべての正例に対する損失を計算
-        loss = F.cross_entropy(logits, labels) # InfoNCE Loss
-
-        # 5. パラメータ更新
-        self.contrastive_optimizer.zero_grad()
-        loss.backward()
-
         parameters = (
             list(self.sa_encoder.parameters())
             + list(self.goal_encoder.parameters())
         )
-        nn.utils.clip_grad_norm_(parameters, max_norm=0.5)
+        for _ in range(self.contrastive_epochs):
+            sa_repr = self.sa_encoder(sa_inputs)
+            goal_repr = self.goal_encoder(goals)
+            logits = -torch.cdist(sa_repr, goal_repr)
+            loss = F.cross_entropy(logits.masked_fill(~allowed, -torch.inf), labels)
 
-        self.contrastive_optimizer.step()
+            self.contrastive_optimizer.zero_grad()
+            loss.backward()
+            nn.utils.clip_grad_norm_(parameters, max_norm=0.5)
+            self.contrastive_optimizer.step()
 
         # 学習結果の保存と経験の初期化
+        goal_values, counts = torch.unique(hindsight_goals.cpu(), dim=0, return_counts=True)
+        for goal, count in zip(goal_values.tolist(), counts.tolist()):
+            key = tuple(goal)
+            self.cumulative_positive_goal_counts[key] = self.cumulative_positive_goal_counts.get(key, 0) + count
         self.contrastive_loss = loss.detach().item()
         self._contrastive_pending = []
         return True
@@ -456,7 +453,7 @@ class GRAG:
             if len(transitions) > 1:
                 advantages = (advantages - advantages.mean()) / (advantages.std(unbiased=False) + 1e-8)
 
-        for _ in range(4):
+        for _ in range(2):
             log_probs = self._exploration_log_probs(self.actor(states), epsilons)
             distribution = torch.distributions.Categorical(logits=log_probs)
             ratio = (distribution.log_prob(actions) - old_log_probs).exp()

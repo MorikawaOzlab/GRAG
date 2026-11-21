@@ -784,6 +784,11 @@ class GridWorldSGCRL:
 
         return encode(observation["position"]), encode(observation["goal"])
 
+    def set_gridworld_goal(self, goal):
+        if self._map_spec is not None:
+            self._map_spec = (*self._map_spec[:3], tuple(goal))
+            self._policy_cache.clear()
+
     def choose_action(self, observation, greedy=False):
         state, goal = self._features(observation)
         if not greedy:

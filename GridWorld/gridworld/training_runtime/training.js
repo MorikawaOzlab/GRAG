@@ -57,6 +57,7 @@ function syncControls() {
   $('start-measurement').disabled = !initialized || !selectedMap || busy || active;
   $('measurement-limit').disabled = busy || active;
   $('max-steps').disabled = measuring || stopping || job?.saving;
+  $('grag-contrastive-epochs').disabled = busy || measuring || stopping || job?.saving;
   $('pause-training').textContent = measuring ? '計測を停止' : 'Ⅱ 一時停止';
   $('stop-fast').disabled = busy || stopping || job?.saving;
   const count = Number($('batch-episodes').value);
@@ -64,6 +65,8 @@ function syncControls() {
   $('fast-progress').hidden = !skipping;
   $('skip-overlay').hidden = !skipping;
   $('animation').parentElement.classList.toggle('skipping', skipping);
+  $('animation').classList.toggle('goal-selectable', initialized && Boolean(selectedMap) &&
+    !busy && !stopping && !job?.saving && (!active || (current && !skipping)));
   $('live-indicator').classList.toggle('watching', watching);
   $('live-indicator').textContent = skipping ? '高速学習' : watching ? 'LIVE · 学習中' : current ? '一時停止' : '待機';
   $('phase-badge').textContent = measuring ? '100%到達まで計測中' : skipping ? '高速学習中' : watching ? '観察しながら学習中' : current ? '一時停止' : result?.benchmark ? ({reached: '100%到達・計測完了', limit: '時間上限・未達成', cancelled: '計測を停止'}[result.benchmark.status] || '計測終了') : '学習0回・開始前';
@@ -225,10 +228,8 @@ function drawLive(data) {
   }
   animationHandle = requestAnimationFrame(animate);
 }
-function drawHeat(map, visits) {
-  heatmapMap = map;
-  const canvas = $('heatmap'), context = canvas.getContext('2d');
-  const zoom = Number($('heat-zoom').value || 100) / 100;
+function drawCountHeatmap(canvas, map, counts, zoom) {
+  const context = canvas.getContext('2d');
   const stage = canvas.parentElement, style = getComputedStyle(stage);
   const paddingX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
   const paddingY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
@@ -247,20 +248,27 @@ function drawHeat(map, visits) {
   if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
   canvas.style.width = width + 'px'; canvas.style.height = height + 'px';
   context.setTransform(density, 0, 0, density, 0, 0);
-  const max = Math.max(0, ...visits.flat()), total = visits.flat().reduce((a, b) => a + b, 0);
+  const values = counts.flat();
+  const max = Math.max(0, ...values), total = values.reduce((a, b) => a + b, 0);
   const walls = new Set(map.obstacles.map(cell => cell.join(',')));
   context.fillStyle = '#dce6eb'; context.fillRect(0, 0, width, height);
   for (let r = 0; r < map.rows; r++) for (let c = 0; c < map.cols; c++) {
-    const wall = walls.has(r + ',' + c), ratio = max ? visits[r][c] / max : 0;
+    const wall = walls.has(r + ',' + c), ratio = max ? counts[r][c] / max : 0;
     context.fillStyle = wall ? '#354f60' : 'rgb(' + Math.round(255 - 35 * ratio) + ',' + Math.round(255 - 158 * ratio) + ',' + Math.round(255 - 180 * ratio) + ')';
     context.fillRect(c * unit + 1, r * unit + 1, unit - 2, unit - 2);
     if (!wall) {
       context.fillStyle = ratio > .7 ? '#fff' : '#344e5b';
       context.font = '600 ' + Math.max(1, Math.min(38 * zoom, unit * .32)) + 'px sans-serif';
       context.textAlign = 'center'; context.textBaseline = 'middle';
-      context.fillText(visits[r][c].toLocaleString(), (c + .5) * unit, (r + .5) * unit, Math.max(1, unit - 8));
+      context.fillText(counts[r][c].toLocaleString(), (c + .5) * unit, (r + .5) * unit, Math.max(1, unit - 8));
     }
   }
+  return {context, unit, max, total};
+}
+function drawHeat(map, visits) {
+  heatmapMap = map;
+  const zoom = Number($('heat-zoom').value || 100) / 100;
+  const {context, unit, max, total} = drawCountHeatmap($('heatmap'), map, visits, zoom);
   if (matches(result) && result.mode === 'grag' && valueGoal) {
     const [r, c] = valueGoal;
     context.fillStyle = '#078878'; context.beginPath();
@@ -366,7 +374,9 @@ async function openPolicyCell(row, col, anchor) {
   }
 }
 function render(data) {
-  if (result && (result.session_id !== data.session_id || result.mode !== data.mode || result.map.name !== data.map.name)) {
+  if (result && (result.session_id !== data.session_id || result.mode !== data.mode || result.map.name !== data.map.name ||
+      result.map.goal.join(',') !== data.map.goal.join(','))) {
+    lastDrawn = null;
     closePolicyPopup(false);
     closeValuePopup();
     valueToken++; valueGrid = null; valueKey = null; valueGoal = null; valueSnapshotGoal = null; $('value-warning').hidden = true;
@@ -413,8 +423,34 @@ async function ensureInteractive(fresh = false) {
     settings: { ...settings, episodes: 0 }, completed_episodes: 0, history: [], visits: Array.from({ length: selectedMap.rows }, () => Array(selectedMap.cols).fill(0)),
     live: { episode: 1, step: 0, position: selectedMap.start }, can_continue: true };
   await control('limit', { max_steps: settings.max_steps });
+  if (body.session_id && body.mode === 'grag') {
+    await control('contrastive_epochs', { grag_contrastive_epochs: settings.grag_contrastive_epochs });
+  }
   if (matches(result)) render(result);
 }
+
+$('animation').onclick = async event => {
+  const canvas = $('animation');
+  if (!canvas.classList.contains('goal-selectable')) return;
+  const map = matches(result) ? result.map : selectedMap;
+  const rect = canvas.getBoundingClientRect();
+  const row = Math.floor((event.clientY - rect.top) / rect.height * map.rows);
+  const col = Math.floor((event.clientX - rect.left) / rect.width * map.cols);
+  if (!integer(row, 0, map.rows - 1) || !integer(col, 0, map.cols - 1)) return;
+  const goal = [row, col];
+  if ([map.start, ...map.obstacles].some(cell => cell[0] === row && cell[1] === col)) {
+    message('スタートと障害物を除いたマスを選んでください。', true);
+    return;
+  }
+  if (map.goal[0] === row && map.goal[1] === col) return;
+  busy = true; syncControls();
+  try {
+    await ensureInteractive();
+    await control('goal', { goal });
+    message(`最終ゴールを [${row}, ${col}] に変更します。訪問回数はゼロから集計します。`);
+  } catch (error) { message(error.message, true); }
+  finally { busy = false; syncControls(); }
+};
 async function action(kind) {
   if (busy) return;
   busy = true; syncControls();
@@ -556,6 +592,15 @@ $('max-steps').onchange = () => {
   if (!integer(value, 1, 1000000)) { message('最大行動回数は1〜1,000,000の整数にしてください。', true); return; }
   if (interactive()) control('limit', { max_steps: value }).then(() => message('最大行動回数を変更しました。次の試行から適用します。')).catch(error => message(error.message, true));
 };
+$('grag-contrastive-epochs').onchange = async () => {
+  const value = Number($('grag-contrastive-epochs').value);
+  if (!integer(value, 1, 1000)) { message('対照学習のエポック数は1〜1000の整数にしてください。', true); return; }
+  if (!interactive()) return;
+  try {
+    await control('contrastive_epochs', { grag_contrastive_epochs: value });
+    message('対照学習のエポック数を変更しました。次の更新から適用します。');
+  } catch (error) { message(error.message, true); }
+};
 $('heatmap').onmousemove = event => {
   const cell = heatCellAt(event);
   if (cell && matches(result)) $('heat-detail').textContent = '[' + cell.row + ', ' + cell.col + '] · ' + result.visits[cell.row][cell.col].toLocaleString() + '訪問 · クリックで行動確率';
@@ -628,10 +673,41 @@ if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => redrawHeat()
 
 let valueGrid = null, valueMap = null, valueTimer = null, valueToken = 0, valueKey = null;
 let valueGoal = null, valueSnapshotGoal = null;
+let positiveCountKey = null, positiveCountMap = null, positiveCountGrid = null;
+function drawPositiveCountMap() {
+  if (!positiveCountGrid || $('value-section').hidden) return;
+  const zoom = Number($('value-zoom').value || 100) / 100;
+  const {max, total} = drawCountHeatmap($('positive-count-map'), positiveCountMap, positiveCountGrid, zoom);
+  $('positive-count-max').textContent = max.toLocaleString() + '件';
+  $('positive-count-total').textContent = '累計 ' + total.toLocaleString() + '件';
+}
+function renderPositiveCounts(data) {
+  const counts = data.cumulative_positive_goal_counts;
+  const key = data.session_id + ':' + data.map.name + ':' + JSON.stringify(counts);
+  if (key === positiveCountKey) return;
+  positiveCountKey = key;
+  $('positive-count-stage').hidden = !counts?.length;
+  $('positive-count-legend').hidden = !counts?.length;
+  if (!counts?.length) {
+    positiveCountMap = null; positiveCountGrid = null;
+    $('positive-count-total').textContent = '';
+    $('positive-count-status').textContent = '正例数の記録はまだありません。';
+    return;
+  }
+
+  positiveCountMap = data.map;
+  positiveCountGrid = Array.from({length: data.map.rows}, () => Array(data.map.cols).fill(0));
+  for (const {goal: [row, col], count} of counts) {
+    positiveCountGrid[row][col] = count;
+  }
+  $('positive-count-status').textContent = 'この学習セッションで各マスをHER目標として使った累計です。';
+  drawPositiveCountMap();
+}
 function scheduleValueMap(data) {
   const visible = data?.mode === 'grag' && matches(data);
   $('value-section').hidden = !visible;
   if (!visible) { valueToken++; valueGrid = null; valueKey = null; closeValuePopup(); $('value-warning').hidden = true; return; }
+  renderPositiveCounts(data);
   if (!valueGoal) {
     valueGoal = [...data.map.goal];
     $('value-goal-row').value = valueGoal[0]; $('value-goal-col').value = valueGoal[1];
@@ -786,8 +862,13 @@ $('value-goal-reset').onclick = () => {
 };
 $('value-zoom').value = '100';
 $('value-zoom-value').value = '100%';
-$('value-zoom').oninput = drawValueMap;
-$('value-fit').onclick = () => { $('value-zoom').value = '100'; drawValueMap(); $('value-map').parentElement.scrollTo(0, 0); };
+$('value-zoom').oninput = () => { drawValueMap(); drawPositiveCountMap(); };
+$('value-fit').onclick = () => {
+  $('value-zoom').value = '100';
+  $('value-zoom').oninput();
+  $('value-map').parentElement.scrollTo(0, 0);
+  $('positive-count-stage').scrollTo(0, 0);
+};
 $('value-close').onclick = closeValuePopup;
 $('value-map').onclick = event => {
   if (!valueGrid || !valueMap) return;
@@ -798,4 +879,8 @@ $('value-map').onkeydown = event => { if ((event.key === 'Enter' || event.key ==
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('value-popup').hidden) { closeValuePopup(); $('value-map').focus({preventScroll:true}); } });
 document.addEventListener('pointerdown', event => { if (!$('value-popup').hidden && !$('value-popup').contains(event.target) && event.target !== $('value-map')) closeValuePopup(); });
 window.addEventListener('resize', drawValueMap);
-if (typeof ResizeObserver !== 'undefined') new ResizeObserver(drawValueMap).observe($('value-map').parentElement);
+window.addEventListener('resize', drawPositiveCountMap);
+if (typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(drawValueMap).observe($('value-map').parentElement);
+  new ResizeObserver(drawPositiveCountMap).observe($('positive-count-stage'));
+}

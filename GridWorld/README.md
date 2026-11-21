@@ -42,15 +42,13 @@ GRAGの編集先は `agents/grag_impl/grag.py` です。既存の参照用実装
 
 - `scripts/map_app.bat`：マップ作成
 - `scripts/settings_app.bat`：環境のルール
-- `scripts/training_app.bat`：AI学習
+- `scripts/training_app.bat`：AI学習を開き、マップ作成と設定のアプリも起動
 
 表示されたURLをブラウザで開いてください。終了するときは、そのアプリのターミナルで `Ctrl+C` を押します。
 
-PowerShellから起動する場合:
+3つのアプリをPowerShellからまとめて起動する場合:
 
 ```powershell
-.\scripts\map_app.bat
-.\scripts\settings_app.bat
 .\scripts\training_app.bat
 ```
 

@@ -97,6 +97,41 @@ class LiveApiTests(unittest.TestCase):
         return self.post("/api/train/control", {
             "action": action, "session_id": training_app.current_job["session_id"], **fields})
 
+    def test_goal_change_resets_visits_and_survives_session_reload(self):
+        from urllib.error import HTTPError
+
+        with patch.dict(training_app.LEARNING_AGENTS, {"q_learning": CountingAgent}):
+            self.post("/api/train", {"map_name": MAP["name"], "execution": "observe",
+                                     "step_delay_ms": 2000})
+            self.state_when(lambda item: item.get("preview", {}).get("total_steps") == 1)
+            self.change("pause")
+            before = self.state_when(lambda item: item["status"] == "paused")["preview"]
+            self.assertEqual(sum(map(sum, before["visits"])), 1)
+            for invalid in (MAP["start"], MAP["obstacles"][0], [-1, 0]):
+                with self.assertRaises(HTTPError) as error:
+                    self.change("goal", goal=invalid)
+                self.assertEqual(error.exception.code, 400)
+            self.change("goal", goal=[1, 0])
+            changed = self.state_when(lambda item: item["preview"]["map"]["goal"] == [1, 0]
+                                      and not item.get("saving"))["preview"]
+            self.assertEqual(changed["visits"], [[0, 0, 0], [0, 0, 0]])
+            self.assertEqual(changed["live"]["position"], MAP["start"])
+            self.assertEqual(changed["live"]["step"], 0)
+            self.assertEqual(changed["total_steps"], before["total_steps"])
+            self.assertEqual(changed["completed_episodes"], before["completed_episodes"])
+            self.change("skip", episodes=1)
+            after = self.state_when(lambda item: item["status"] == "paused"
+                                    and item["preview"]["completed_episodes"] == 1)["preview"]
+            self.assertEqual(after["visits"], [[0, 0, 0], [1, 0, 0]])
+            self.assertTrue(after["live"]["reached_goal"])
+            self.assertEqual(storage.read_json(storage.map_path(MAP["name"])), MAP)
+
+        session = TrainingSession(MAP, SETTINGS)
+        session.set_goal([1, 0])
+        restored = TrainingSession.restore(json.loads(json.dumps(session.result(checkpoint=True))))
+        self.assertEqual(restored.world.map["goal"], [1, 0])
+        self.assertEqual(restored.source_goal, MAP["goal"])
+
     @unittest.skipUnless(importlib.util.find_spec("torch") is not None, "PyTorch is required")
     def test_ppo_cpu_threads_leave_two_logical_cpus_free(self):
         import torch
@@ -306,6 +341,26 @@ class LiveApiTests(unittest.TestCase):
         self.assertNotEqual(first["session_id"], second["session_id"])
         self.assertTrue(training_app.saved_session_path(first["session_id"]).is_file())
         self.assertNotIn(first["session_id"], training_app.learning_sessions)
+
+    def test_grag_contrastive_epochs_change_applies_to_resumed_training(self):
+        first = self.post("/api/train", {"map_name": MAP["name"], "mode": "grag",
+                                        "execution": "paused", "training_settings": {
+                                            "max_steps": 1, "grag_update_interval": 2,
+                                            "grag_contrastive_epochs": 1}})
+        self.state_when(lambda item: item["status"] == "paused")
+        session = training_app.learning_sessions[first["session_id"]]["session"]
+
+        self.change("contrastive_epochs", grag_contrastive_epochs=3)
+        self.state_when(lambda item: item.get("preview", {}).get("settings", {}).get("grag_contrastive_epochs") == 3)
+        self.assertEqual(session.agent.contrastive_epochs, 3)
+        with patch.object(session.agent.contrastive_optimizer, "step",
+                          wraps=session.agent.contrastive_optimizer.step) as step:
+            self.change("skip", episodes=2)
+            self.state_when(lambda item: item["status"] == "paused"
+                            and item.get("preview", {}).get("completed_episodes") == 2)
+        self.assertEqual(step.call_count, 3)
+        saved = storage.read_json(training_app.saved_session_path(first["session_id"]))
+        self.assertEqual(saved["settings"]["grag_contrastive_epochs"], 3)
 
 
 if __name__ == "__main__":

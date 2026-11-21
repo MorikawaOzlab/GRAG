@@ -92,9 +92,10 @@ def find_session(session_id, mode, selected):
         learning_sessions[session_id] = entry
     if entry["mode"] != mode:
         raise ValueError("続行時は同じAIを選択してください。")
-    if entry["session"].world.map != selected:
+    session = entry["session"]
+    if {**session.world.map, "goal": session.source_goal} != selected:
         raise ValueError("続行時は同じマップを選択してください。変更した場合は新しい学習を始めてください。")
-    return entry["session"]
+    return session
 
 
 def public_job(job):
@@ -201,6 +202,14 @@ def run_job(job: dict, selected: dict, settings: dict, mode: str) -> None:
                 execution = job["_control"]
                 target = job.get("_target", 0)
                 save_requested = job.pop("_save_requested", False)
+                contrastive_epochs = job.pop("_contrastive_epochs", None)
+                goal = job.pop("_goal", None)
+            if contrastive_epochs is not None:
+                session.set_contrastive_epochs(contrastive_epochs)
+                save_requested = True
+            if goal is not None and session.set_goal(goal):
+                publish(force=True)
+                save_requested = True
             if execution == "close":
                 save()
                 with job_lock:
@@ -328,7 +337,7 @@ class TrainingHandler(Handler):
                               "map_name": session.world.map["name"]})
         if path == "/api/train/control":
             action = request.get("action")
-            if action not in ("pause", "observe", "skip", "speed", "limit"):
+            if action not in ("pause", "observe", "skip", "speed", "limit", "contrastive_epochs", "goal"):
                 raise ValueError("学習操作が正しくありません。")
             episodes = validate_episodes(request.get("episodes")) if action == "skip" else None
             delay = validate_delay(request.get("step_delay_ms")) if action == "speed" else None
@@ -362,6 +371,15 @@ class TrainingHandler(Handler):
                 elif action == "limit":
                     session.set_max_steps(request.get("max_steps"))
                     job["_save_requested"] = True
+                elif action == "contrastive_epochs":
+                    if job["mode"] != "grag":
+                        raise ValueError("対照学習のエポック数の変更はGRAGに対応しています。")
+                    job["_contrastive_epochs"] = GRAGSession.validate_contrastive_epochs(
+                        request.get("grag_contrastive_epochs"))
+                elif action == "goal":
+                    goal = request.get("goal")
+                    session.validate_goal(goal)
+                    job["_goal"] = goal
                 else:
                     job["step_delay_ms"] = delay
                 job["_wake"].set()
