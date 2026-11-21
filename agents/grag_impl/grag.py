@@ -72,7 +72,7 @@ class GRAG:
         self.policy_loss = None
         self.contrastive_loss = None
         self.cumulative_positive_goal_counts: dict[tuple[float, ...], int] = {}
-        self._contrastive_pending = []  # 異なるエピソードの負例が揃うまで保持
+        self._contrastive_pending = []  # バッチ内に負例が揃うまで保持
         self._network_spec = None
         self.episodes = []    # 終了したエピソードの軌跡
         self.trajectory = []  # 現在のエピソードの遷移
@@ -351,10 +351,7 @@ class GRAG:
         self._contrastive_pending.extend(transitions)
         batch = self._contrastive_pending
 
-        episode_ids = torch.tensor([t["episode_id"] for t in batch])
-
-        # 異なるエピソードが2つ以上必要
-        if episode_ids.unique().numel() < 2:
+        if len(batch) < 2:
             self.contrastive_loss = None
             return False
 
@@ -381,24 +378,27 @@ class GRAG:
         hindsight_goals = self._sample_hindsight_goals(batch)
         goals = hindsight_goals.to(reference)
 
-        # 3. 同じHER目標と正例・負例の組を全エポックで使う。
-        sa_inputs = torch.cat([states, actions], dim=-1)
-        episode_ids = episode_ids.to(device)
-        labels = torch.arange(len(batch), device=device)
+        # 各行の正例は、その遷移の (s, a) と HER で割り当てたゴールの組。
+        batch_size = len(batch)
+        negative_count = min(255, batch_size - 1)
+        positive_indices = torch.arange(batch_size).unsqueeze(1)
+        negative_indices = torch.stack([
+            torch.randperm(batch_size - 1, generator=self._generator)[:negative_count].clone()
+            for _ in batch
+        ])
+        # 正例のインデックスを飛ばして、残りの遷移から重複なしで抽選する。
+        negative_indices += negative_indices >= positive_indices
+        candidate_indices = torch.cat((positive_indices, negative_indices), dim=1).to(device)
+        labels = torch.zeros(batch_size, dtype=torch.long, device=device)
+        sa_inputs = torch.cat((states, actions), dim=-1)
+        parameters = list(self.sa_encoder.parameters()) + list(self.goal_encoder.parameters())
 
-        # 正例を用意 : 同一エピソード内の他の経験を負例から除外
-        allowed = episode_ids[:, None] != episode_ids[None, :]
-        allowed[labels, labels] = True
-
-        parameters = (
-            list(self.sa_encoder.parameters())
-            + list(self.goal_encoder.parameters())
-        )
+        # ゴールを行に固定し、候補の (s, a) に対する InfoNCE をバッチで平均する。
         for _ in range(self.contrastive_epochs):
             sa_repr = self.sa_encoder(sa_inputs)
             goal_repr = self.goal_encoder(goals)
-            logits = -torch.cdist(sa_repr, goal_repr)
-            loss = F.cross_entropy(logits.masked_fill(~allowed, -torch.inf), labels)
+            logits = -torch.cdist(goal_repr, sa_repr).gather(1, candidate_indices)
+            loss = F.cross_entropy(logits, labels)
 
             self.contrastive_optimizer.zero_grad()
             loss.backward()
